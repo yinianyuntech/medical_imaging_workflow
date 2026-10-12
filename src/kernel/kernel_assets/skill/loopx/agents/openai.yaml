@@ -1,0 +1,6 @@
+# <!-- loopx-managed-slash-command:v1 command=/loopx surface=codex-skill-metadata -->
+interface:
+  display_name: "LoopX"
+  short_description: "Inspect LoopX state, or start concrete project work when arguments are provided."
+policy:
+  allow_implicit_invocation: false

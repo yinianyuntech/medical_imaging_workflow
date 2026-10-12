@@ -70,3 +70,6 @@ kernel_home/
 
 # ---- LoopX 本地状态 ----
 .loopx/
+
+# ---- 随包 loopx CLI 构建产物（二进制，随 release 分发）----
+assets/loopx/

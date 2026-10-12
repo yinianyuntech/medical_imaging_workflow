@@ -1,0 +1,7 @@
+{
+  "integration_mode": "python_distribution_cli",
+  "loopx_version": "1.4.0",
+  "owner": "loopx_workflow_skills_cli",
+  "schema_version": "loopx_installed_skill_version_v0",
+  "skill_id": "loopx-doc-registry"
+}

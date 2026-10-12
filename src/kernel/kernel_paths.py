@@ -273,9 +273,62 @@ def kernel_env(extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     env["OPENCODE_CONFIG_DIR"] = str(opencode_config_dir())
     env["OPENCODE_CLIENT"] = "desktop"          # 注册 question 工具
     env["OPENCODE_DISABLE_AUTOUPDATE"] = "1"    # 嵌入场景禁自更新
+    # 随包 loopx CLI：加到 PATH，内嵌 openCode 的 agent 可直接运行 `loopx ...`
+    try:
+        _lx = loopx_exe()
+        if _lx:
+            env["PATH"] = str(Path(_lx).resolve().parent) + os.pathsep + env.get("PATH", "")
+    except Exception:
+        pass
     for k, v in (extra or {}).items():
         env[k] = str(v)
     return env
+
+
+def loopx_exe() -> str:
+    """随包 loopx CLI 定位（V2.0）：
+
+    `MIMW_LOOPX_EXE` 环境变量 → 随包 `assets/loopx/loopx.exe`
+    （冻结= _MEIPASS、源码=仓库根）→ `<app_home>/loopx/` → PATH。
+    内嵌 openCode 的 agent 用 `loopx` 命令驱动 LoopX 控制平面。
+    """
+    env = os.environ.get("MIMW_LOOPX_EXE", "").strip()
+
+    def _ok(p) -> str:
+        try:
+            if p and os.path.isfile(str(p)):
+                return str(p)
+        except Exception:
+            pass
+        return ""
+
+    if env:
+        got = _ok(env)
+        if got:
+            return got
+    names = ("loopx.exe", "loopx")
+    cands = []
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass:
+        for n in names:
+            cands.append(Path(meipass) / "assets" / "loopx" / n)
+    try:
+        for n in names:
+            cands.append(project_root() / "assets" / "loopx" / n)
+    except Exception:
+        pass
+    for n in names:
+        cands.append(app_home() / "loopx" / n)
+    for c in cands:
+        got = _ok(c)
+        if got:
+            return got
+    try:
+        import shutil as _sh
+        w = _sh.which("loopx")
+        return w or ""
+    except Exception:
+        return ""
 
 
 def ensure_kernel_dirs() -> None:

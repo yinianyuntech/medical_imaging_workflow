@@ -49,7 +49,7 @@ hidden = [
 
 # ── Exclude unused heavy packages ──
 excludes = [
-    "tkinter", "PyQt6", "PySide2", "PySide6",
+    "tkinter", "PySide2", "PySide6",
     "notebook", "jupyter", "jupyter_client", "ipython",
     "tensorflow", "tensorboard",
     "bokeh", "plotly", "dash",

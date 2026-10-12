@@ -1,0 +1,4 @@
+interface:
+  display_name: "LoopX Project"
+  short_description: "Connect, configure, and diagnose LoopX projects"
+  default_prompt: "Use the LoopX project lifecycle workflow for the requested connection, configuration, registry, or status diagnosis. Ordinary task execution follows its current interaction contract."

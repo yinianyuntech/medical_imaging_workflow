@@ -206,3 +206,21 @@ python main.py        # 底部「OPENCODE 智能体」栏 → 启动内核 → �
 3. `mcp_list` 等子进程输出已强制 UTF-8 解码（GBK 控制台会崩）。
 4. 破坏性工具默认拒绝，需宿主注入确认钩子（`_common.set_confirm_hook`）。
 5. `gui_status` 只返回主线程推入的快照，**绝不含 HTTP 密码**。
+
+
+---
+
+## 随包 loopx CLI（V2.0）
+
+内嵌 openCode 的默认 agent（loopx）用 loopx 命令驱动 LoopX 控制平面。V2.0 起
+**loopx CLI 随应用打包分发**，无需目标机单独安装：
+
+- 构建：用 PyInstaller 在最小 venv（pillow/defusedxml/mcp）中对 loopx.entrypoint:main
+  构建独立 loopx.exe（onedir，约 94 MB），产物放入 ssets/loopx/（二进制不入库，
+  随 release 分发；完整版 spec 经 	ree_datas("assets") 自动收集）；
+- 定位：kernel_paths.loopx_exe()：MIMW_LOOPX_EXE → 随包 ssets/loopx/loopx.exe
+  （冻结=_MEIPASS）→ <app_home>/loopx/ → PATH；
+- 注入：kernel_env() 把 loopx 目录**前置**到内核 PATH —— 内嵌 openCode 的 agent
+  直接运行 loopx ... 即命中随包版本；
+- 技能：loopx* 全套技能（13 个）已并入 kernel_assets/skill/，随内核安装进
+  隔离 home（与 loopx agent 定义配套）。
