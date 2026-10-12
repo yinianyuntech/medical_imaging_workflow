@@ -4,7 +4,7 @@ from pathlib import Path
 
 # PROJECT_ROOT：优先环境变量；否则沿用历史硬编码路径（若存在）；再回退到 spec 所在目录。
 _HARDCODED = Path(r"F:\RSNA\medical_imaging_workflow")
-_SPEC_DIR = Path(globals().get("SPECPATH", os.path.dirname(os.path.abspath(__file__))))
+_SPEC_DIR = Path(globals().get("SPECPATH") or os.getcwd())  # PyInstaller 里 __file__ 未定义（实测踩坑）
 PROJECT_ROOT = Path(
     os.environ.get("MIMW_PROJECT_ROOT")
     or (_HARDCODED if _HARDCODED.exists() else _SPEC_DIR)
@@ -49,13 +49,14 @@ hidden = [
 
 # ── Exclude unused heavy packages ──
 excludes = [
-    "tkinter", "PySide2", "PySide6",
+    "tkinter", "PyQt5", "PySide2", "PySide6",
     "notebook", "jupyter", "jupyter_client", "ipython",
     "tensorflow", "tensorboard",
+    "paddle", "paddleocr", "onnxruntime", "onnx",
     "bokeh", "plotly", "dash",
     "sphinx", "docutils",
     "devtools", "black", "isort", "pylint",
-    "pytest", "unittest",
+    "pytest",
     "Cython",
     "mypy",
     "pythoncom", "pywintypes", "win32com",
@@ -95,7 +96,8 @@ a = Analysis(
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=([str(PROJECT_ROOT / "build_scripts" / "runtime_hook.py")]
+                  if (PROJECT_ROOT / "build_scripts" / "runtime_hook.py").is_file() else []),
     excludes=excludes,
     noarchive=True,
     optimize=0,
@@ -106,10 +108,8 @@ pyz = PYZ(a.pure, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="MedicalImagingWorkflow",
     debug=False,
     bootloader_ignore_signals=False,

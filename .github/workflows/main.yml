@@ -1,1 +1,176 @@
+name: build
 
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "构建成功后将产物上传到 Release v2.0"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  # ================================================================ Windows exe
+  build-windows:
+    name: Windows exe (V2.0)
+    runs-on: windows-latest
+    timeout-minutes: 150
+    env:
+      MIMW_PROJECT_ROOT: ${{ github.workspace }}
+      MIMW_SKIP_KERNEL: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "pyinstaller>=6.10,<7"
+
+      - name: Build bundled loopx CLI (minimal venv, ~94MB standalone)
+        shell: pwsh
+        run: |
+          python -m venv lo
+          lo\Scripts\python -m pip install --quiet pillow defusedxml "mcp==2.3.0" "pyinstaller>=6.10,<7" "loopx==1.4.0"
+          @'
+          import sys
+          from loopx.entrypoint import main
+          if __name__ == "__main__":
+              sys.exit(main())
+          '@ | Set-Content -Encoding UTF8 loopx_entry.py
+          lo\Scripts\python -m PyInstaller --noconfirm --clean --log-level WARN --name loopx --collect-all loopx --distpath loopx_dist --workpath loopx_work --specpath loopx_work loopx_entry.py
+          if (!(Test-Path loopx_dist\loopx\loopx.exe)) { throw "loopx build failed" }
+          New-Item -ItemType Directory -Force assets\loopx | Out-Null
+          Copy-Item loopx_dist\loopx\* assets\loopx -Recurse -Force
+
+      - name: Build app (PyInstaller)
+        run: python -m PyInstaller --noconfirm --clean --log-level WARN MedicalImagingWorkflow.spec
+
+      - name: Verify artifact
+        shell: pwsh
+        run: |
+          if (!(Test-Path dist\MedicalImagingWorkflow\MedicalImagingWorkflow.exe)) { throw "exe missing" }
+          if (!(Test-Path dist\MedicalImagingWorkflow\_internal\assets\loopx\loopx.exe)) { throw "bundled loopx missing" }
+          $s = (Get-ChildItem dist\MedicalImagingWorkflow -Recurse -File | Measure-Object Length -Sum).Sum
+          Write-Host ("dist size: {0:N1} MB" -f ($s/1MB))
+
+      - name: Package (7z split volumes <=1900MB)
+        shell: pwsh
+        run: |
+          $seven = (Get-Command 7z.exe -ErrorAction SilentlyContinue).Source
+          if (-not $seven) { $seven = "C:\Program Files\7-Zip\7z.exe" }
+          if (!(Test-Path $seven)) { throw "7z not found" }
+          & $seven a -v1900m -mx=5 MedicalImagingWorkflow_V2.0_windows_x64.7z .\dist\MedicalImagingWorkflow
+          if ($LASTEXITCODE -ne 0) { throw "7z failed" }
+          Get-ChildItem MedicalImagingWorkflow_V2.0_windows_x64.7z* | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MedicalImagingWorkflow-V2.0-windows
+          path: MedicalImagingWorkflow_V2.0_windows_x64.7z*
+          if-no-files-found: error
+          compression-level: 0
+
+  # ================================================================ macOS dmg（实验性）
+  build-macos:
+    name: macOS dmg (V2.0, experimental)
+    runs-on: macos-latest
+    timeout-minutes: 150
+    continue-on-error: true
+    env:
+      MIMW_PROJECT_ROOT: ${{ github.workspace }}
+      MIMW_SKIP_KERNEL: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "pyinstaller>=6.10,<7"
+
+      - name: Build bundled loopx CLI (minimal venv)
+        run: |
+          python -m venv lo
+          lo/bin/python -m pip install --quiet pillow defusedxml "mcp==2.3.0" "pyinstaller>=6.10,<7" "loopx==1.4.0"
+          printf 'import sys\nfrom loopx.entrypoint import main\nif __name__ == "__main__":\n    sys.exit(main())\n' > loopx_entry.py
+          lo/bin/python -m PyInstaller --noconfirm --clean --log-level WARN --name loopx --collect-all loopx --distpath loopx_dist --workpath loopx_work --specpath loopx_work loopx_entry.py
+          test -f loopx_dist/loopx/loopx
+          mkdir -p assets/loopx
+          cp -Rp loopx_dist/loopx/. assets/loopx/
+
+      - name: Patch spec for macOS (.ico -> no icon)
+        run: |
+          python - <<'PY'
+          p = "MedicalImagingWorkflow.spec"
+          s = open(p, encoding="utf-8").read()
+          s = s.replace('    icon=str(PROJECT_ROOT / "assets/icon.ico"),\n', '')
+          open(p, "w", encoding="utf-8").write(s)
+          print("spec patched for macOS")
+          PY
+
+      - name: Build app (PyInstaller)
+        run: python -m PyInstaller --noconfirm --clean --log-level WARN MedicalImagingWorkflow.spec
+
+      - name: Create dmg
+        run: |
+          test -x dist/MedicalImagingWorkflow/MedicalImagingWorkflow
+          hdiutil create -volname "MedicalImagingWorkflow V2.0" -srcfolder dist/MedicalImagingWorkflow -ov -format UDZO MedicalImagingWorkflow_V2.0_macos_x64.dmg
+          ls -lh MedicalImagingWorkflow_V2.0_macos_x64.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MedicalImagingWorkflow-V2.0-macos
+          path: MedicalImagingWorkflow_V2.0_macos_x64.dmg
+          if-no-files-found: error
+          compression-level: 0
+
+  # ================================================================ 发布 Release
+  release:
+    name: Publish Release v2.0
+    needs: [build-windows, build-macos]
+    if: >-
+      always() && needs.build-windows.result == 'success'
+      && (github.event_name == 'push' || inputs.publish_release)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish to GitHub Release v2.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -x
+          ls -la artifacts || true
+          gh release view v2.0 >/dev/null 2>&1 || \
+            gh release create v2.0 --title "V2.0" --latest --notes "Release V2.0 —— 内嵌 openCode 智能体（独立 TUI 控制台 / 推理网关共享上下文 / 委托式写作）+ 随包 loopx CLI；Step4 图文 Word（批注+正文同步）；Step5 批量一稿一 docx；双主题（液态玻璃 / 鎏金）；PyQt6 兼容层。Windows 便携版为 7z 分卷（.001/.002…，用 7-Zip 解压）；macOS dmg 为实验性构建（未签名，首次打开需右键→打开或 xattr -cr）。"
+          fail=0
+          for f in artifacts/MedicalImagingWorkflow_V2.0_windows_x64.7z*; do
+            if [ -e "$f" ]; then gh release upload v2.0 "$f" --clobber || fail=1; else fail=1; fi
+          done
+          for f in artifacts/MedicalImagingWorkflow_V2.0_macos_x64.dmg; do
+            if [ -e "$f" ]; then gh release upload v2.0 "$f" --clobber || true; fi
+          done
+          exit $fail
