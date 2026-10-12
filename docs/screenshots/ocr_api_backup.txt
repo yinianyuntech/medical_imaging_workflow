@@ -1,0 +1,60 @@
+stub 服务器: http://127.0.0.1:51267/v1
+测试图: C:\Users\chris\AppData\Local\Temp\ocr_backup_test\sample.png  (2400x900，故意超过缩放阈值)
+
+========================================================================================
+1) 图像编码（缩放 + data URL）
+========================================================================================
+   [PASS] 编码成功: bytes=43864
+   [PASS] 长边被缩到 <= 2000: (2400, 900) → (2000, 750) scale=0.8333
+   [PASS] data URL 前缀正确: data:image/jpeg;base64,/9j/4AAQSkZJRgABA…
+
+========================================================================================
+2) 回退路由 + 请求体形状（原链路失败 → 应调 API）
+========================================================================================
+   [PASS] 原链路失败时回退到 API: engine=api_vision
+   [PASS] 拿到 stub 返回的文本: '识别结果第一行\n识别结果第二行'
+   [PASS] 记录了备份信息: {"used": true, "model": "stub-vl-model", "base_url": "http://127.0.0.1:51267/v1", "source": "explicit_config", "elapsed_s": 0.12, "primary_error": "si
+   [PASS] 记录了原链路的失败原因: simulated_local_failure
+   [PASS] stub 收到 1 次请求: 次数=1
+   请求体摘要: model=stub-vl-model messages=1 auth=Bearer sk-stub-key…
+   [PASS] model 透传正确: model=stub-vl-model
+   [PASS] content 含 text + image_url: kinds=['text', 'image_url']
+   [PASS] image_url 是 data URL: data:image/jpeg;base64,/9j/4AAQSkZ…
+   [PASS] Authorization 头带上 key: Bearer sk-stub-key
+   [PASS] temperature=0（OCR 要确定性）: temperature=0.0
+
+========================================================================================
+3) 原链路成功 → 不得打扰 API（零多余流量）
+========================================================================================
+   [PASS] 沿用本地结果: engine=deepseek_ocr
+   [PASS] 未发起 API 请求: 次数=0
+   [PASS] 无 backup 字段: keys=['text', 'extracted_text', 'engine', 'status']
+
+========================================================================================
+4) 未配 key → 明确给出原因（不静默）
+========================================================================================
+   [PASS] available() 为 False: 未配置 OCR API key（可设 MIMW_OCR_API_KEY，或在 config/custom_api_profiles.json
+   summary={"available": false, "source": "none", "base_url": "https://api.deepseek.com/v1", "model": "deepseek-vl2", "key_len": 0}
+
+========================================================================================
+5) API 报 401 → provider 原话必须暴露
+========================================================================================
+   [PASS] backup.used=True: True
+   [PASS] backup.success=False: False
+   [PASS] 暴露 http_401: http_401: {"error": {"message": "Authentication Fails, invalid key", "type": "authenticati
+   [PASS] 暴露 provider message: http_401: {"error": {"message": "Authentication Fails, invalid key", "type": "authentication_error"}}
+
+========================================================================================
+6) backup_api=False 可关闭备份
+========================================================================================
+   [PASS] 未回退（engine 仍是原链路）: engine=deepseek_ocr
+   [PASS] 未发起请求: 次数=0
+
+========================================================================================
+7) '模型不支持图像' 这类错误也要原样暴露
+========================================================================================
+   [PASS] 暴露 no_vision 原话: http_400: {"error": {"message": "model does not support image input", "type": "invalid_request_error"}}
+
+========================================================================================
+total=24 passed=24 failed=0
+RESULT: PASS

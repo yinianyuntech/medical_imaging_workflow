@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QEvent, QTimer, Qt
-from PyQt5.QtWidgets import QFrame, QLabel, QVBoxLayout
+from src.core.qt_compat.QtCore import QEvent, QTimer, Qt
+from src.core.qt_compat.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from src.utils.gpu_manager import gpu_manager
 

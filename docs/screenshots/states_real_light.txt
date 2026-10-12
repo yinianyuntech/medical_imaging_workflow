@@ -1,0 +1,37 @@
+====================================================================================
+真机四态点验（真实鼠标）  主题=light
+====================================================================================
+控件         状态             最大差      >4像素       总像素  判定
+------------------------------------------------------------------------------------
+button     hover           17      1514      5632  OK 可见  
+button2    hover           36      2561      5632  OK 可见  
+line       hover           10     21206     27426  OK 可见  
+combo      hover           19      1612      3960  OK 可见  
+check      hover           10       369      2280  OK 可见  
+radio      hover           10       321      2280  OK 可见  
+slider     hover           18      1350      8763  OK 可见  
+scroll     hover           18      5229      8001  OK 可见  
+header     hover           21      7678     34686  OK 可见  
+button     pressed        179      2707      5632  OK 可见  
+button2    pressed        139      4753      5632  OK 可见  
+scroll     pressed        145      5787      8001  OK 可见  
+button     disabled        90      3435      5632  OK 可见  
+line       disabled       206     20957     27426  OK 可见  
+combo      disabled       141      3754      3960  OK 可见  
+check      disabled       149      1282      2280  OK 可见  
+slider     disabled       110      3926      8763  OK 可见  
+scroll     disabled        91      4961      8001  OK 可见  
+button     focus          180      1419      5632  OK 可见  
+line       focus          207      8192     27426  OK 可见  
+combo      focus          165      1491      3960  OK 可见  
+check      focus          157      1142      2280  OK 可见  
+radio      focus          157      1125      2280  OK 可见  
+slider     focus          167       321      8763  OK 可见  
+tabs       focus          166      1371     72630  OK 可见  
+check      selected       149       156      2280  OK 可见  
+radio      selected       165       117      2280  OK 可见  
+tabs       selected       233      6431     72630  OK 可见  
+combo      selected       221       137      3960  OK 可见  
+------------------------------------------------------------------------------------
+合计 29 项，异常 0 项
+RESULT: PASS

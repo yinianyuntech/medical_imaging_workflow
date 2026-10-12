@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QMessageBox, QApplication
-from PyQt5.QtCore import Qt
+from src.core.qt_compat.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QMessageBox, QApplication
+from src.core.qt_compat.QtCore import Qt
 import sys
 import os
 
@@ -46,10 +46,25 @@ class LicenseActivationDialog(QDialog):
         layout.addWidget(self.info)
         btn_row = QHBoxLayout()
         self.btn_ok = QPushButton("激活并继续")
+        try:
+            from src.utils.app_icons import apply_icon
+            apply_icon(self.btn_ok, "check", "text", 15)
+        except Exception:
+            pass
         self.btn_ok.clicked.connect(self.on_activate)
         self.btn_mgr = QPushButton("打开授权管理器")
+        try:
+            from src.utils.app_icons import apply_icon
+            apply_icon(self.btn_mgr, "settings", "text", 15)
+        except Exception:
+            pass
         self.btn_mgr.clicked.connect(self.open_manager)
         self.btn_cancel = QPushButton("取消")
+        try:
+            from src.utils.app_icons import apply_icon
+            apply_icon(self.btn_cancel, "close", "text", 15)
+        except Exception:
+            pass
         self.btn_cancel.clicked.connect(self.reject)
         btn_row.addStretch()
         btn_row.addWidget(self.btn_mgr)

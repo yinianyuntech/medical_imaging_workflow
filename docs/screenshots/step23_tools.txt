@@ -1,0 +1,76 @@
+==========================================================================================
+step2 / step3 工具端到端验证
+==========================================================================================
+   临时存储: C:\Users\chris\AppData\Local\Temp\step23_selftest_1791777844（monkeypatch _storage_path，不写用户数据库）
+   合成数据: C:\Users\chris\AppData\Local\Temp\step23_selftest_1791777844\measurements.csv  (120 行)
+
+==========================================================================================
+step2 — DuckDB
+==========================================================================================
+   [PASS] duckdb_tables 成功: views=1
+   可用视图: ['measurements']
+   [PASS] 能看见 measurements.csv: ['measurements']
+   [PASS] GROUP BY 查询成功: 
+   [PASS] 返回 3 组: row_count=3
+   结果: ['group', 'n', 'mean'] [['Treatment', 40, 14.504], ['Placebo', 40, 10.512], ['Control', 40, 9.431]]
+   [PASS] 只读守卫拦住 DROP: 仅允许只读查询，检测到禁止关键字: drop
+   [PASS] 只读守卫拦住 DELETE: 仅允许只读查询，检测到禁止关键字: delete
+
+==========================================================================================
+step2 — 统计检验
+==========================================================================================
+   [PASS] compute_statistics 成功: 
+   [PASS] 有描述统计: {"n": 120, "mean": 11.482191666666665, "std": 2.6421424280333574, "min": 6.607, "q1": 9.564499999999999, "medi
+   [PASS] 有正态性检验: {"test": "shapiro", "stat": 0.9676309184577885, "p": 0.005456549895280054}
+   [PASS] 多组走 ANOVA/Kruskal: oneway_anova
+   [PASS] 检出显著差异（p<0.05，构造数据故意有差异）: p=2.769e-30
+   [PASS] 相关性检验可用: {"name": "spearman", "r": -0.045288267614705294, "p": 0.623307966445823, "n": 120}
+
+==========================================================================================
+step2 — Nature 级绘图
+==========================================================================================
+   [PASS] plot bar: files={'pdf': 7357, 'svg': 9579, 'png': 45413} 
+   [PASS] bar 宽度=单栏 89mm: width_in=3.504
+   [PASS] PDF 魔数正确: → %PDF
+   [PASS] SVG 是矢量文本: → <svg
+   [PASS] plot box: files={'pdf': 7223, 'svg': 11190, 'png': 36829} 
+   [PASS] plot violin: files={'pdf': 12161, 'svg': 23180, 'png': 100995} 
+   [PASS] plot scatter: files={'pdf': 8106, 'svg': 29532, 'png': 107968} 
+   [PASS] plot hist: files={'pdf': 6125, 'svg': 14005, 'png': 33740} 
+   [PASS] plot heatmap: files={'pdf': 24575, 'svg': 42145, 'png': 125751} 
+
+==========================================================================================
+step2 — 关键词提取
+==========================================================================================
+   [PASS] extract_keywords 成功: 
+   Top 词: ['患者', '影像', '像组', '组学', '学特', '特征', '征稳', '稳定', '影像组', '像组学', '组学特', '学特征']
+   [PASS] 提出现实词（含中文）: ['患者', '影像', '像组', '组学', '学特', '特征']
+   [PASS] 纯文本模式可用: ['影像', '像组', '组学', '影像组', '像组学', '影像组学']
+
+==========================================================================================
+step3 — docxtpl 出稿（内建模板）
+==========================================================================================
+   [PASS] manuscript 渲染成功: C:\Users\chris\AppData\Local\Temp\step23_selftest_1791777844\exports\docx_20261012_120408\selftest_manuscript.docx 37103B
+   [PASS] 是合法 docx（zip 结构）: entries=17
+   [PASS] 标题已渲染（无未替换占位符）: 含标题=True 残留占位符=False
+   [PASS] 参考文献已渲染: → 找到第 1 条
+   [PASS] literature-review 渲染成功: 37196B
+
+==========================================================================================
+step3 — 文献检索 / 下载（真实网络）
+==========================================================================================
+   search_papers: success=True count=5 per_source={'europepmc': 0, 'crossref': 5, 'arxiv': 0}
+   source_errors=['europepmc: HTTP 200 但 hitCount=20194（服务端无命中）', 'arxiv: HTTP 429（arXiv 限流：需间隔 3 秒以上重试）']
+     [crossref] 2023 DWI Radiomics and Stroke: What is Their Role in Prognosis?
+     [crossref]  Longitudinal radiomics for prognosis in non-small cell lung cancer
+     [crossref] 2023 Radiomics: Harnessing Imaging Data for Cancer Diagnosis and Progno
+   [PASS] 外部检索通道可用（网络）: count=5；若为 False 多为网络/限流，非代码问题
+   （本次检索未含 arxiv 条目，跳过真实 PDF 下载）
+   [PASS] 非 PDF 响应被拒绝（不落盘假 PDF）: 返回的不是 PDF（Content-Type=text/html; charset=utf-8）；常见于出版商的登录页/错误页
+   [PASS] literature_to_docx 一键流程: papers=3 docx=C:\Users\chris\AppData\Local\Temp\step23_selftest_1791777844\exports\docx_20261012_120518\lit_review_radiomics_prognosis.docx
+
+   已清理临时目录 C:\Users\chris\AppData\Local\Temp\step23_selftest_1791777844
+
+==========================================================================================
+total=32 passed=32 failed=0
+RESULT: PASS

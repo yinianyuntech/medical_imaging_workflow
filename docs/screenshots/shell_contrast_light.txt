@@ -1,0 +1,9 @@
+主题=light
+标题栏容器	bg=#F4F7FA	fg=#0A1524	来源=palette	ratio=17.05
+标题(mimwTitleText)	bg=#AEBACA	fg=#08111F	来源=widget:QLabel/#mimwTitleText	ratio=9.62
+标题(mimwProjectText)	bg=#AEBACA	fg=#35445A	来源=widget:QLabel/#mimwProjectText	ratio=5.02
+菜单栏	bg=#D0DDED	fg=#0A1524	来源=palette	ratio=13.31
+状态栏	bg=#B7C9DF	fg=#35445A	来源=palette	ratio=5.85
+状态栏(gpu_owner_label)	bg=#B7C9DF	fg=#35445A	来源=appQSS/QStatusBar QLabel	ratio=5.85
+状态栏(license_label)	bg=#B7C9DF	fg=#35445A	来源=appQSS/QStatusBar QLabel	ratio=5.85
+opencode面板	bg=#F2F5F9	fg=#0A1524	来源=palette	ratio=16.76

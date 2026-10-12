@@ -12,14 +12,15 @@ from __future__ import annotations
 
 from typing import List, Dict, Optional
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtCore import Qt, QThread, pyqtSignal
+from src.core.qt_compat.QtWidgets import (
     QAbstractItemView, QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QMessageBox, QProgressBar, QPushButton, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from src.services.setup_service import SetupService, MODEL_SPECS
+from src.utils.app_icons import apply_icon
 
 
 def _fmt_bytes(v) -> str:
@@ -112,8 +113,10 @@ class FirstRunDialog(QDialog):
 
         row_btns = QHBoxLayout()
         self.btn_dl_missing = QPushButton("一键下载缺失项")
+        apply_icon(self.btn_dl_missing, "download", "text", 16)
         self.btn_dl_missing.clicked.connect(self.download_missing)
         self.btn_refresh_models = QPushButton("重新检测")
+        apply_icon(self.btn_refresh_models, "refresh", "text", 16)
         self.btn_refresh_models.clicked.connect(self.refresh_models)
         row_btns.addWidget(self.btn_dl_missing)
         row_btns.addWidget(self.btn_refresh_models)
@@ -134,6 +137,7 @@ class FirstRunDialog(QDialog):
         self.lbl_ollama = QLabel("检测中…")
         self.lbl_ollama.setWordWrap(True)
         btn_recheck = QPushButton("重新检测 Ollama")
+        apply_icon(btn_recheck, "refresh", "text", 16)
         btn_recheck.clicked.connect(self.refresh_ollama)
         ollama_row.addWidget(self.lbl_ollama, 1)
         ollama_row.addWidget(btn_recheck)
@@ -153,6 +157,7 @@ class FirstRunDialog(QDialog):
 
         api_row = QHBoxLayout()
         self.btn_test = QPushButton("保存并测试")
+        apply_icon(self.btn_test, "check", "text", 16)
         self.btn_test.clicked.connect(self.save_and_test_api)
         self.lbl_api = QLabel("")
         self.lbl_api.setWordWrap(True)
@@ -165,16 +170,21 @@ class FirstRunDialog(QDialog):
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setMinimumHeight(110)
-        self.log.setStyleSheet("font-family:Consolas,monospace;font-size:11px;")
+        # 透明底：让皮肤的环境背景/玻璃透过来（Fusion 默认灰色 Base 会显得像补丁）
+        self.log.setStyleSheet(
+            "font-family:Consolas,monospace;font-size:11px;"
+            "background:transparent;border:none;padding:4px;")
         root.addWidget(self.log)
 
         # 底部按钮 -------------------------------------------------------
         foot = QHBoxLayout()
         foot.addStretch()
         self.btn_done = QPushButton("完成")
+        apply_icon(self.btn_done, "check", "text", 16)
         self.btn_done.setDefault(True)
         self.btn_done.clicked.connect(self.on_done)
         self.btn_later = QPushButton("稍后")
+        apply_icon(self.btn_later, "close", "text", 16)
         self.btn_later.clicked.connect(self.reject)
         foot.addWidget(self.btn_later)
         foot.addWidget(self.btn_done)
@@ -205,6 +215,7 @@ class FirstRunDialog(QDialog):
             self.table.setItem(r, 2, QTableWidgetItem(spec.get("size_label", "")))
 
             btn = QPushButton("重新下载" if present else "下载")
+            apply_icon(btn, "download", "text", 15)
             btn.clicked.connect(lambda _=False, rid=spec["id"]: self.download_one(rid))
             self.table.setCellWidget(r, 3, btn)
         self.table.resizeRowsToContents()

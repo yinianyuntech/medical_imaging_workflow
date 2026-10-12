@@ -1,12 +1,12 @@
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QFileDialog, QTextEdit, QScrollArea, QGroupBox, QSpinBox,
     QCheckBox, QProgressBar, QListWidget, QSplitter, QComboBox,
     QSlider, QListWidgetItem, QTabWidget, QGridLayout, QFrame,
     QDoubleSpinBox, QMessageBox
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
-from PyQt5.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent
+from src.core.qt_compat.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
+from src.core.qt_compat.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent
 import glob
 import os
 import sys
@@ -19,6 +19,7 @@ from src.services.user_service import UserService
 from src.utils.logger import get_logger
 from src.core.user_id_manager import UserIDManager
 from src.core.event_bus import get_event_bus, EventNames
+from src.utils.app_icons import apply_icon
 import time
 import json
 
@@ -389,14 +390,17 @@ class OCRWidget(QWidget):
         button_layout = QHBoxLayout()
         
         self.select_file_btn = QPushButton("选择单个文件")
+        apply_icon(self.select_file_btn, "file", "text", 16)
         self.select_file_btn.clicked.connect(self.select_image_file)
         button_layout.addWidget(self.select_file_btn)
         
         self.select_folder_btn = QPushButton("选择文件夹")
+        apply_icon(self.select_folder_btn, "folder", "text", 16)
         self.select_folder_btn.clicked.connect(self.select_image_folder)
         button_layout.addWidget(self.select_folder_btn)
         
         self.clear_selection_btn = QPushButton("清空选择")
+        apply_icon(self.clear_selection_btn, "close", "text", 16)
         self.clear_selection_btn.clicked.connect(self.clear_file_selection)
         self.clear_selection_btn.setEnabled(False)
         button_layout.addWidget(self.clear_selection_btn)
@@ -502,6 +506,7 @@ class OCRWidget(QWidget):
         
         # 处理按钮
         self.process_btn = QPushButton("开始OCR识别")
+        apply_icon(self.process_btn, "scan-text", "text", 16)
         self.process_btn.clicked.connect(self.start_ocr_processing)
         self.process_btn.setEnabled(False)
         layout.addWidget(self.process_btn)
@@ -515,11 +520,13 @@ class OCRWidget(QWidget):
         history_layout.addWidget(self.session_list)
         
         refresh_btn = QPushButton("刷新列表")
+        apply_icon(refresh_btn, "refresh", "text", 16)
         refresh_btn.clicked.connect(self.refresh_session_list)
         history_layout.addWidget(refresh_btn)
         
         # 清除历史会话按钮
         clear_sessions_btn = QPushButton("清除历史会话")
+        apply_icon(clear_sessions_btn, "trash", "on", 16)
         clear_sessions_btn.clicked.connect(self.clear_all_sessions)
         clear_sessions_btn.setStyleSheet("""
             QPushButton {
@@ -597,19 +604,27 @@ class OCRWidget(QWidget):
         button_layout = QHBoxLayout()
         
         self.copy_text_btn = QPushButton("复制文本")
+        apply_icon(self.copy_text_btn, "copy", "text", 16)
+        self.copy_text_btn.setMinimumWidth(160)
         self.copy_text_btn.clicked.connect(self.copy_text_to_clipboard)
         self.copy_text_btn.setEnabled(False)
         button_layout.addWidget(self.copy_text_btn)
         
         self.save_text_btn = QPushButton("保存为文本文件")
+        apply_icon(self.save_text_btn, "save", "text", 16)
+        self.save_text_btn.setMinimumWidth(160)
         self.save_text_btn.clicked.connect(self.save_text_to_file)
         self.save_text_btn.setEnabled(False)
         button_layout.addWidget(self.save_text_btn)
         
         self.save_annotated_btn = QPushButton("保存标注图像")
+        apply_icon(self.save_annotated_btn, "image", "text", 16)
+        self.save_annotated_btn.setMinimumWidth(160)
         self.save_annotated_btn.clicked.connect(self.save_annotated_image)
         self.save_annotated_btn.setEnabled(False)
         button_layout.addWidget(self.save_annotated_btn)
+        
+        button_layout.addStretch()
         
         result_layout.addLayout(button_layout)
         
@@ -644,7 +659,7 @@ class OCRWidget(QWidget):
     def _update_image_preview(self, image_path):
         """更新图片预览"""
         try:
-            from PyQt5.QtGui import QPixmap, QImage
+            from src.core.qt_compat.QtGui import QPixmap, QImage
             import cv2
             import numpy as np
             
@@ -1090,7 +1105,7 @@ class OCRWidget(QWidget):
             
     def _show_error_dialog(self, title, technical_error, user_friendly_error):
         """显示错误对话框"""
-        from PyQt5.QtWidgets import QMessageBox
+        from src.core.qt_compat.QtWidgets import QMessageBox
         
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Critical)
@@ -1261,7 +1276,7 @@ class OCRWidget(QWidget):
     def copy_text_to_clipboard(self):
         """复制文本到剪贴板"""
         try:
-            from PyQt5.QtWidgets import QApplication
+            from src.core.qt_compat.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(self.ocr_result_text.toPlainText())
             self.status_label.setText("文本已复制到剪贴板")

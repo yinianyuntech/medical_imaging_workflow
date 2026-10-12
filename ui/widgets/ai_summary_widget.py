@@ -6,15 +6,16 @@ import re
 import urllib.parse
 import concurrent.futures
 from pathlib import Path
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
+from src.core.qt_compat.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
                              QPushButton, QTextEdit, QTextBrowser, QFrame, QSplitter,
                              QApplication, QGraphicsView, QGraphicsScene, QCheckBox,
                              QDialog, QLineEdit, QInputDialog, QMessageBox,
                              QDoubleSpinBox, QSpinBox)
-from PyQt5.QtGui import QPainter, QBrush, QPen, QColor, QFont, QPolygonF, QPainterPath
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QPointF, QTimer
+from src.core.qt_compat.QtGui import QPainter, QBrush, QPen, QColor, QFont, QPolygonF, QPainterPath
+from src.core.qt_compat.QtCore import Qt, QThread, pyqtSignal, QPointF, QTimer
 
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon
 
 # Import Agent Core Loop Executor
 from src.ai.agent_core_loop import AgentCoreLoopExecutor
@@ -319,15 +320,31 @@ class CoreLoopWorker(QThread):
                     inject_parts.append("[STEP2_ARTIFACTS]\n" + "\n".join(pre_artifacts[:20]))
                 effective_raw_content = "\n".join(inject_parts).strip() + "\n\n" + effective_raw_content
             
-            # Execute the loop
-            self.progress_signal.emit("Phase 1: Generating Outline...")
-            
-            result = self.executor.execute_paper_writing(
-                effective_raw_content,
-                self.project_id,
-                judge_config=self.judge_config,
-                workspace=str(self.workspace or self.project_storage_path),
-            )
+            # 执行写作：默认=内嵌 opencode（原程序内 skill loop 已移出运行路径）
+            engine = (os.environ.get("MIMW_DRAFT_ENGINE") or "opencode").strip().lower()
+            if engine == "legacy":
+                self.progress_signal.emit("Phase 1: Generating Outline... (legacy core loop)")
+                result = self.executor.execute_paper_writing(
+                    effective_raw_content,
+                    self.project_id,
+                    judge_config=self.judge_config,
+                    workspace=str(self.workspace or self.project_storage_path),
+                )
+            else:
+                self.progress_signal.emit(
+                    "引擎: 内嵌 opencode —— 原 skill loop 已移除，写作/评审/精修委托给智能体会话")
+                from src.ai.opencode_delegation import run_delegated_pipeline
+                result = run_delegated_pipeline(
+                    project_id=self.project_id,
+                    project_name="",
+                    raw_content=effective_raw_content,
+                    template_constraints_json=self.template_constraints_json,
+                    workspace=str(self.workspace or self.project_storage_path),
+                    storage_path=str(self.project_storage_path or ""),
+                    on_progress=lambda m: self.progress_signal.emit(str(m)),
+                    on_stream=lambda t: self.stream_signal.emit(str(t)),
+                    max_seconds=3600.0,
+                )
             if isinstance(result, dict) and isinstance(pre_mining, dict):
                 result["step2_pre_mining"] = pre_mining
             
@@ -785,6 +802,7 @@ from src.services.database_service import DatabaseService
 from src.services.data_cleaning_service import DataCleaningService
 
 from src.services.ollama_local_service import OllamaLocalService, CustomLLMService
+from src.kernel.inference_gateway import OpenCodeLLMService, infer_backend
 from src.services.pubmed_service import PubMedService
 import cocoindex
 
@@ -998,7 +1016,7 @@ class CustomAPIDialog(QDialog):
         # ── mode hint ────────────────────────────────────────────────
         self.mode_hint = QLabel("提示: Thinking 模式会将 CoT 推理过程单独输出，适合复杂推理任务")
         self.mode_hint.setWordWrap(True)
-        from PyQt5.QtGui import QColor
+        from src.core.qt_compat.QtGui import QColor
         self.mode_hint.setStyleSheet("color: #888; font-size: 11px;")
         layout.addWidget(self.mode_hint)
 
@@ -1008,8 +1026,10 @@ class CustomAPIDialog(QDialog):
         btns = QHBoxLayout()
         btns.addStretch()
         self.save_btn = QPushButton("保存")
+        apply_icon(self.save_btn, "save", "text", 15)
         self.save_btn.clicked.connect(self._on_save)
         cancel_btn = QPushButton("取消")
+        apply_icon(cancel_btn, "close", "text", 15)
         cancel_btn.clicked.connect(self.reject)
         btns.addWidget(self.save_btn)
         btns.addWidget(cancel_btn)
@@ -1064,6 +1084,8 @@ class AISummaryWidget(QWidget):
         self.db_service = DatabaseService()
         self.data_service = DataCleaningService(self.db_service)
         self.ollama = OllamaLocalService()
+        # 内嵌 opencode 推理（默认后端）：与项目会话共享上下文
+        self._opencode_llm = OpenCodeLLMService()
         self.pubmed = PubMedService()
         
         # Initialize CocoIndex
@@ -1133,39 +1155,45 @@ class AISummaryWidget(QWidget):
         self.model_combo = QComboBox()
         self.model_combo.setFixedHeight(24)
 
-        self.refresh_models_btn = QPushButton("⟳")
+        self.refresh_models_btn = QPushButton("")
+        apply_icon(self.refresh_models_btn, "refresh", "text", 15)
         self.refresh_models_btn.setFixedHeight(24)
         self.refresh_models_btn.setFixedWidth(32)
         self.refresh_models_btn.setToolTip("刷新模型列表")
         self.refresh_models_btn.clicked.connect(self._refresh_models)
 
-        self.custom_api_btn = QPushButton("+ Custom API")
+        self.custom_api_btn = QPushButton("Custom API")
+        apply_icon(self.custom_api_btn, "plug", "text", 15)
         self.custom_api_btn.setFixedHeight(24)
-        self.custom_api_btn.setFixedWidth(90)
+        self.custom_api_btn.setFixedWidth(112)
         self.custom_api_btn.clicked.connect(self._on_custom_api_clicked)
 
         self.custom_api_delete_btn = QPushButton("删除")
+        apply_icon(self.custom_api_delete_btn, "trash", "text", 15)
         self.custom_api_delete_btn.setFixedHeight(24)
-        self.custom_api_delete_btn.setFixedWidth(44)
+        self.custom_api_delete_btn.setFixedWidth(68)
         self.custom_api_delete_btn.setEnabled(False)
         self.custom_api_delete_btn.clicked.connect(self._on_custom_api_delete_clicked)
 
-        self.prompt_editor_btn = QPushButton("📝 提示词修改")
+        self.prompt_editor_btn = QPushButton("提示词修改")
+        apply_icon(self.prompt_editor_btn, "edit", "text", 15)
         self.prompt_editor_btn.setFixedHeight(24)
-        self.prompt_editor_btn.setFixedWidth(100)
+        self.prompt_editor_btn.setFixedWidth(118)
         self.prompt_editor_btn.setToolTip("Open flow-chart editor for agent core loop prompts")
         self.prompt_editor_btn.clicked.connect(self._on_prompt_editor_clicked)
 
         self.token_label = QLabel("Tok: 0")
         self.token_label.setFixedHeight(24)
         self.token_label.setStyleSheet("color:#888;font-size:11px;padding:0 4px;")
-        self.token_reset_btn = QPushButton("🗑")
+        self.token_reset_btn = QPushButton("")
+        apply_icon(self.token_reset_btn, "refresh", "text", 14)
         self.token_reset_btn.setFixedHeight(22)
-        self.token_reset_btn.setFixedWidth(28)
+        self.token_reset_btn.setFixedWidth(30)
         self.token_reset_btn.setToolTip("清零Token计数")
         self.token_reset_btn.clicked.connect(self._on_token_reset)
         
         self.analyze_button = QPushButton("开始科学分析 (RAG)")
+        apply_icon(self.analyze_button, "play", "text", 16)
         self.analyze_button.setFixedHeight(26)
         self.analyze_button.clicked.connect(self.on_analyze_clicked)
         
@@ -1181,27 +1209,28 @@ class AISummaryWidget(QWidget):
         top_layout.addWidget(self.docs_kb_checkbox)
 
         self.kb_sync_btn = QPushButton("同步KB(增量)")
+        apply_icon(self.kb_sync_btn, "refresh", "text", 15)
         self.kb_sync_btn.setFixedHeight(24)
         self.kb_sync_btn.clicked.connect(lambda: self.start_project_index(force=False))
         top_layout.addWidget(self.kb_sync_btn)
 
         self.kb_rebuild_btn = QPushButton("重建KB(全量)")
+        apply_icon(self.kb_rebuild_btn, "database", "text", 15)
         self.kb_rebuild_btn.setFixedHeight(24)
         self.kb_rebuild_btn.clicked.connect(lambda: self.start_project_index(force=True))
         top_layout.addWidget(self.kb_rebuild_btn)
 
         self.template_btn = QPushButton("Template Wizard")
+        apply_icon(self.template_btn, "wand", "on", 15)
         self.template_btn.setFixedHeight(24)
+        # 固定品牌红（#D91035 在语义色白名单里，两种主题下都保留）——
+        # 不再按 is_dark 分支：分支里的深灰/亮红会被皮肤清理，导致
+        # 浅色主题下按钮回退成金属面 + 白图标（对比度差）。
         self.template_btn.setStyleSheet(
-            ("QPushButton{background-color:%s;color:%s;font-weight:bold;padding:4px 10px;border-radius:6px;}"
-             "QPushButton:hover{background-color:%s;}"
-             "QPushButton:pressed{background-color:%s;}")
-            % (
-                "#4A4A4A" if is_dark else "#FF1744",
-                "#F5D0FE" if is_dark else "white",
-                "#5A5A5A" if is_dark else "#F01440",
-                "#3E3E3E" if is_dark else "#D91035",
-            )
+            "QPushButton{background-color:#D91035;color:#FFFFFF;font-weight:bold;"
+            "padding:4px 10px;border-radius:6px;}"
+            "QPushButton:hover{background-color:#C2185B;}"
+            "QPushButton:pressed{background-color:#AD1457;}"
         )
         self.template_btn.clicked.connect(self.on_template_wizard_clicked)
         top_layout.addWidget(self.template_btn)
@@ -1305,13 +1334,19 @@ class AISummaryWidget(QWidget):
     def _update_model_ui(self):
         self.logger.info(f"AISummaryWidget.load_models: models_detected={len(self.models)} -> {self.models}")
         self.log(f"AISummaryWidget.load_models: models_detected={len(self.models)}")
+        prev = self.model_combo.currentText() if hasattr(self, "model_combo") else ""
         self.model_combo.clear()
-        all_items = self.models[:]
+        all_items = ([self.OPENCODE_ITEM] if infer_backend() != "legacy" else []) + self.models[:]
         for p in self._custom_api_profiles:
             name = p.get("name", "Custom")
             all_items.append(f"__custom__{name}")
         if all_items:
             self.model_combo.addItems(all_items)
+            want = prev if prev in all_items else (
+                self.OPENCODE_ITEM if infer_backend() != "legacy" else all_items[0])
+            idx = self.model_combo.findText(want)
+            if idx >= 0:
+                self.model_combo.setCurrentIndex(idx)
             self.log("AISummaryWidget.load_models: models loaded into combo, enabling analyze button")
             self.logger.info("AISummaryWidget.load_models: models loaded into combo, button enabled")
             self.model_combo.setEnabled(True)
@@ -1420,6 +1455,8 @@ class AISummaryWidget(QWidget):
         dlg.exec_()
 
     def _active_llm_service(self) -> Any:
+        if self._opencode_selected():
+            return self._opencode_llm
         current = self.model_combo.currentText() or ""
         if current.startswith("__custom__"):
             name = current[len("__custom__"):]
@@ -1441,6 +1478,11 @@ class AISummaryWidget(QWidget):
         self._chat_history.clear()
         return self.ollama
 
+    OPENCODE_ITEM = "OpenCode:内嵌（共享上下文）"
+
+    def _opencode_selected(self) -> bool:
+        return (self.model_combo.currentText() or "").startswith("OpenCode:")
+
     def _selected_custom_profile(self) -> Optional[dict]:
         current = self.model_combo.currentText() or ""
         if not current.startswith("__custom__"):
@@ -1449,18 +1491,33 @@ class AISummaryWidget(QWidget):
         return next((p for p in self._custom_api_profiles if p.get("name") == name), None)
 
     def _current_model_name(self) -> str:
+        if self._opencode_selected():
+            return ""  # 内嵌 opencode：内核配置模型（默认 deepseek/deepseek-flash）
         prof = self._selected_custom_profile()
         if prof:
             return str(prof.get("model") or "deepseek-v4-flash")
         return self.model_combo.currentText() if self.model_combo else "llama3"
 
     def _current_service_label(self) -> str:
+        if self._opencode_selected():
+            return "内嵌 opencode（共享上下文）"
         prof = self._selected_custom_profile()
         if prof:
             return f"Custom API: {prof.get('name', 'Custom')}"
         return "Ollama"
 
     def _current_judge_config(self) -> dict:
+        if self._opencode_selected():
+            # judge 也走内嵌 opencode（共享上下文）；model 仅作非空标签
+            return {
+                "enabled": True,
+                "base_url": "",
+                "api_key": "",
+                "model": "opencode:default",
+                "temperature": 0.0,
+                "max_tokens": 600,
+                "timeout_s": 120.0,
+            }
         svc = self._active_llm_service()
         model = self._current_model_name()
         base_url = str(getattr(svc, "base_url", "") or "").strip()
@@ -1477,6 +1534,8 @@ class AISummaryWidget(QWidget):
         return cfg
 
     def _current_judge_provider_label(self) -> str:
+        if self._opencode_selected():
+            return "内嵌 opencode（judge 共享上下文）"
         prof = self._selected_custom_profile()
         if prof:
             return "Custom API"
@@ -1493,6 +1552,11 @@ class AISummaryWidget(QWidget):
 
     def set_current_project(self, project_id: str, project_name: str = ""):
         self.current_project_id = project_id
+        try:
+            if hasattr(self._opencode_llm, "set_project"):
+                self._opencode_llm.set_project(project_id)
+        except Exception:
+            pass
         self.current_project_name = project_name or project_id
         self.project_label.setText(f"当前项目: {self.current_project_name} ({self.current_project_id})")
         self._load_template_from_project_metadata()

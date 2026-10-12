@@ -9,7 +9,7 @@
 
 import json
 from typing import List, Optional, Dict, Any
-from PyQt5.QtCore import QObject, pyqtSignal
+from src.core.qt_compat.QtCore import QObject, pyqtSignal
 from datetime import datetime
 
 from src.services.database_service import DatabaseService

@@ -1,0 +1,266 @@
+================================================================================================
+step1~5 全控件功能排查报告
+================================================================================================
+   记录条数: 139   （来自日志 docs\screenshots\controls_audit.jsonl，可跨进程累计）
+
+
+================================================================================================
+第一步 数据整理    控件 109 个
+================================================================================================
+
+── p0 ProjectManagementWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [group] 当前项目                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [combo] test                 QComboBox        是    1     safe         OK       
+   [group] 功能模块                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+                                QPushButton      是    1     unknown      OK       弹框×1
+   [group] 当前项目样本信息             QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   新建样本                         QPushButton      是    1     unknown      OK       弹框×1
+   删除样本                         QPushButton      否    1     destructive  DISABLED 控件当前不可用
+   刷新                           QPushButton      是    1     safe         OK       
+   DICOM                        QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   文本                           QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   OCR                          QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   [group] 项目管理                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   新建项目                         QPushButton      是    1     unknown      OK       弹框×1
+   删除勾选                         QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+   刷新                           QPushButton      是    1     safe         OK       
+   添加根目录                        QPushButton      是    1     unknown      OK       弹框×1
+                                QCheckBox        是    0     unknown      OK       
+
+── p1 DicomRoiWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [group] 控制面板                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [group] 文件选择                 QGroupBox        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   选择DICOM文件                    QPushButton      是    1     safe         OK       弹框×1
+   选择DICOM文件夹                   QPushButton      是    1     safe         OK       弹框×1
+   清空选择                         QPushButton      否    1     safe         DISABLED 控件当前不可用
+   [group] 覆盖层文件夹               QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   选择覆盖层文件夹                     QPushButton      是    1     safe         OK       弹框×1
+   处理覆盖层文件夹                     QPushButton      否    1     destructive  DISABLED 控件当前不可用
+   [group] 处理选项                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   自动保存结果                       QCheckBox        是    0     heavy        SKIP     重任务：不自动触发
+   调试模式                         QCheckBox        是    0     unknown      OK       
+   开始处理                         QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 历史会话                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   刷新                           QPushButton      是    1     safe         OK       
+   清除历史                         QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+   [group] 图像显示                 QGroupBox        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   上一张                          QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   [slider] 0                   QSlider          否    1     unknown      DISABLED 控件当前不可用
+   下一张                          QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   [group] 覆盖层图像                QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   上一覆盖层                        QPushButton      是    1     unknown      OK       
+   下一覆盖层                        QPushButton      是    1     unknown      OK       
+   [group] 信息面板                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [group] DICOM信息              QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [multi] (无占位)                QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [group] ROI识别结果              QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [multi] (无占位)                QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   保存结果                         QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   导出数据                         QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+
+── p2 TextProcessingWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [tabs] 3 页                   QTabWidget       是    0     unknown      OK       
+   [multi] 文本内容将显示在这里...        QTextEdit        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   复制内容                         QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   保存内容                         QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 文件选择                 QGroupBox        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   选择单个文件                       QPushButton      是    1     safe         OK       弹框×1
+   选择文件夹                        QPushButton      是    1     safe         OK       弹框×1
+   清空选择                         QPushButton      否    1     safe         DISABLED 控件当前不可用
+   [group] 文本清理选项               QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   移除多余空白字符                     QCheckBox        是    0     destructive  SKIP     破坏性：交人工确认
+   统一换行符                        QCheckBox        是    0     unknown      OK       
+   移除空行                         QCheckBox        是    0     destructive  SKIP     破坏性：交人工确认
+   移除特殊字符                       QCheckBox        是    0     destructive  SKIP     破坏性：交人工确认
+   转换为小写                        QCheckBox        是    0     unknown      OK       
+   移除标点符号                       QCheckBox        是    0     destructive  SKIP     破坏性：交人工确认
+   [group] 分析选项                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   基础统计分析                       QCheckBox        是    0     safe         OK       
+   关键词提取                        QCheckBox        是    0     unknown      OK       
+   语言分析                         QCheckBox        是    0     unknown      OK       
+   [combo] 词频统计                 QComboBox        是    0     safe         OK       
+   QSpinBox                     QSpinBox         是    0     unknown      OK       
+   自动保存结果                       QCheckBox        是    0     heavy        SKIP     重任务：不自动触发
+   开始文本分析                       QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 导出选项                 QGroupBox        是    -1    heavy        SKIP     重任务：不自动触发
+   [combo] TXT                  QComboBox        是    0     unknown      OK       
+   导出结果                         QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 历史会话                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   刷新列表                         QPushButton      是    1     safe         OK       
+   清除历史会话                       QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+
+── p3 OCRWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [group] 图片预览                 QGroupBox        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   [group] OCR识别结果              QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [multi] OCR识别结果将显示在这里...     QTextEdit        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   复制文本                         QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   保存为文本文件                      QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   保存标注图像                       QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 文件选择                 QGroupBox        是    -1    safe         SKIP     类型不支持自动触发（仅清点）
+   选择单个文件                       QPushButton      是    1     safe         OK       弹框×1
+   选择文件夹                        QPushButton      是    1     safe         OK       弹框×1
+   清空选择                         QPushButton      否    1     safe         DISABLED 控件当前不可用
+   [group] OCR参数                QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [combo] DeepSeek-OCR (推荐)    QComboBox        是    0     unknown      OK       
+   [combo] 中英文混合                QComboBox        是    0     unknown      OK       
+   QDoubleSpinBox               QDoubleSpinBox   是    0     unknown      OK       
+   [group] 图像预处理                QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   启用图像预处理                      QCheckBox        是    0     unknown      OK       
+   QDoubleSpinBox               QDoubleSpinBox   是    0     unknown      OK       
+   高斯模糊去噪                       QCheckBox        是    0     unknown      OK       
+   形态学操作去噪                      QCheckBox        是    0     unknown      OK       
+   直方图均衡化                       QCheckBox        是    0     unknown      OK       
+   对比度增强                        QCheckBox        是    0     unknown      OK       
+   图像锐化                         QCheckBox        是    0     unknown      OK       
+   边缘保持滤波                       QCheckBox        是    0     unknown      OK       
+   [combo] 阈值                   QComboBox        是    0     unknown      OK       
+   自动保存结果                       QCheckBox        是    0     heavy        SKIP     重任务：不自动触发
+   开始OCR识别                      QPushButton      否    1     heavy        DISABLED 控件当前不可用
+   [group] 历史会话                 QGroupBox        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   刷新列表                         QPushButton      是    1     safe         OK       
+   清除历史会话                       QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+
+── p4 MagicSegWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   Open Folder                  QPushButton      是    1     unknown      OK       弹框×1
+   < Prev Image                 QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   Next Image >                 QPushButton      否    1     unknown      DISABLED 控件当前不可用
+   Clear Points                 QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+   Save ROI                     QPushButton      否    1     heavy        DISABLED 控件当前不可用
+
+================================================================================================
+第二步 数据清洗及结构化    控件 7 个
+================================================================================================
+
+── p5 DataCleaningWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [combo] Ollama:qwen_stable   QComboBox        是    0     safe         OK       
+   + Custom API                 QPushButton      是    1     unknown      OK       弹框×1
+   AI数据挖掘与绘图                    QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   打开导出目录                       QPushButton      否    1     safe         DISABLED 控件当前不可用
+                                QAbstractButton  是    1     unknown      OK       
+   [tabs] 2 页                   QTabWidget       是    0     unknown      OK       
+   [multi] (无占位)                QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+
+================================================================================================
+第三步 本地大模型数据科学总结    控件 14 个
+================================================================================================
+
+── p6 AISummaryWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   临时KB                         QCheckBox        是    0     unknown      OK       
+   启用Docs库                      QCheckBox        是    0     unknown      OK       
+   同步KB(增量)                     QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   重建KB(全量)                     QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   Template Wizard              QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   [combo] qwen_stable:latest   QComboBox        是    1     safe         OK       
+   ⟳                            QPushButton      是    1     safe         OK       
+   + Custom API                 QPushButton      是    1     unknown      OK       弹框×1
+   删除                           QPushButton      否    1     destructive  DISABLED 控件当前不可用
+   🗑                            QPushButton      是    1     destructive  SKIP     破坏性：交人工确认
+   📝 提示词修改                      QPushButton      是    1     unknown      OK       弹框×1
+   开始科学分析 (RAG)                 QPushButton      是    1     heavy        SKIP     重任务：不自动触发
+   [multi] 系统日志...              QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [slider] 150                 QScrollBar       是    1     unknown      OK       
+
+================================================================================================
+第四步 科学文本预览生成    控件 7 个
+================================================================================================
+
+── p7 ScientificPreviewWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [multi] Enter refinement i   QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   Rethink Draft (Loop)         QPushButton      是    1     unknown      OK       弹框×1
+   Validate All (CocoIndex)     QPushButton      是    1     unknown      OK       弹框×1
+   格式化预览（引用美化/只读）               QCheckBox        是    1     safe         OK       
+   Confirm  Proceed to Step 5   QPushButton      是    1     unknown      OK       弹框×1
+   [multi] (无占位)                QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+   [multi] Select an issue to   QTextEdit        是    -1    unknown      SKIP     类型不支持自动触发（仅清点）
+
+================================================================================================
+第五步 研究者真实反馈及迭代优化    控件 2 个
+================================================================================================
+
+── p8 FeedbackOptimizationWidget ──
+   控件                           类型               可用   接收    类别           结果       备注
+   --------------------------------------------------------------------------------------------
+   [combo] Newest First         QComboBox        是    1     unknown      OK       
+   仅显示需人工补充                     QCheckBox        是    1     safe         OK       
+
+（--report 模式：未执行测试）
+
+============================================================================================
+覆盖情况与未自动验证清单（本次排查的边界）
+============================================================================================
+   已实际点击验证   : 60
+   未验证合计       : 79   = 破坏性/重任务 20 + 当前不可用 25 + 非交互容器 34
+
+   【破坏性 / 重任务：按安全策略未触发，需人工确认】20 个
+      · p6 AISummaryWidget       同步KB(增量)                       heavy        重任务：不自动触发
+      · p6 AISummaryWidget       重建KB(全量)                       heavy        重任务：不自动触发
+      · p6 AISummaryWidget       Template Wizard                heavy        重任务：不自动触发
+      · p6 AISummaryWidget       🗑                              destructive  破坏性：交人工确认
+      · p6 AISummaryWidget       开始科学分析 (RAG)                   heavy        重任务：不自动触发
+      · p5 DataCleaningWidget    AI数据挖掘与绘图                      heavy        重任务：不自动触发
+      · p0 ProjectManagementWidget 删除勾选                           destructive  破坏性：交人工确认
+      · p1 DicomRoiWidget        自动保存结果                         heavy        重任务：不自动触发
+      · p1 DicomRoiWidget        清除历史                           destructive  破坏性：交人工确认
+      · p1 DicomRoiWidget        保存结果                           heavy        重任务：不自动触发
+      · p1 DicomRoiWidget        导出数据                           heavy        重任务：不自动触发
+      · p2 TextProcessingWidget  移除多余空白字符                       destructive  破坏性：交人工确认
+      · p2 TextProcessingWidget  移除空行                           destructive  破坏性：交人工确认
+      · p2 TextProcessingWidget  移除特殊字符                         destructive  破坏性：交人工确认
+      · p2 TextProcessingWidget  移除标点符号                         destructive  破坏性：交人工确认
+      · p2 TextProcessingWidget  自动保存结果                         heavy        重任务：不自动触发
+      · p2 TextProcessingWidget  清除历史会话                         destructive  破坏性：交人工确认
+      · p3 OCRWidget             自动保存结果                         heavy        重任务：不自动触发
+      · p3 OCRWidget             清除历史会话                         destructive  破坏性：交人工确认
+      · p4 MagicSegWidget        Clear Points                   destructive  破坏性：交人工确认
+
+   【当前不可用（多为「未选样本」时的正常禁用）】25 个
+      · p0 ProjectManagementWidget 删除样本                           destructive
+      · p0 ProjectManagementWidget DICOM                          unknown
+      · p0 ProjectManagementWidget 文本                             unknown
+      · p0 ProjectManagementWidget OCR                            unknown
+      · p1 DicomRoiWidget        清空选择                           safe
+      · p1 DicomRoiWidget        处理覆盖层文件夹                       destructive
+      · p1 DicomRoiWidget        开始处理                           heavy
+      · p1 DicomRoiWidget        上一张                            unknown
+      · p1 DicomRoiWidget        [slider] 0                     unknown
+      · p1 DicomRoiWidget        下一张                            unknown
+      · p2 TextProcessingWidget  复制内容                           unknown
+      · p2 TextProcessingWidget  保存内容                           heavy
+      · p2 TextProcessingWidget  清空选择                           safe
+      · p2 TextProcessingWidget  开始文本分析                         heavy
+      · p2 TextProcessingWidget  导出结果                           heavy
+      · p3 OCRWidget             复制文本                           unknown
+      · p3 OCRWidget             保存为文本文件                        heavy
+      · p3 OCRWidget             保存标注图像                         heavy
+      · p3 OCRWidget             清空选择                           safe
+      · p3 OCRWidget             开始OCR识别                        heavy
+      · p4 MagicSegWidget        < Prev Image                   unknown
+      · p4 MagicSegWidget        Next Image >                   unknown
+      · p4 MagicSegWidget        Save ROI                       heavy
+      · p5 DataCleaningWidget    打开导出目录                         safe
+      · p6 AISummaryWidget       删除                             destructive
+
+   【非交互容器（分组框/文本区），无需点击】34 个
+      · p7 ScientificPreviewWidget 3 个：[multi] Enter re, [multi] (无占位), [multi] Select a
+      · p6 AISummaryWidget       1 个：[multi] 系统日志...
+      · p5 DataCleaningWidget    1 个：[multi] (无占位)
+      · p0 ProjectManagementWidget 4 个：[group] 当前项目, [group] 功能模块, [group] 当前项目样本信息, [group] 项目管理
+      · p1 DicomRoiWidget        12 个：[group] 控制面板, [group] 文件选择, [group] 覆盖层文件夹, [group] 处理选项, [group] 历史会话, [group] 图像显示
+      · p2 TextProcessingWidget  6 个：[multi] 文本内容将显示在, [group] 文件选择, [group] 文本清理选项, [group] 分析选项, [group] 导出选项, [group] 历史会话
+      · p3 OCRWidget             7 个：[group] 图片预览, [group] OCR识别结果, [multi] OCR识别结果将, [group] 文件选择, [group] OCR参数, [group] 图像预处理

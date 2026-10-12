@@ -1,0 +1,41 @@
+========================================================================================
+playbook §5.7 TUI 交互面验证
+========================================================================================
+   exe = C:\Users\chris\AppData\Local\npm-global\node_modules\opencode-ai\node_modules\opencode-windows-x64\bin\opencode.exe
+   KernelBoot.start() 用时 3.74s
+   start() 返回: {'ok': True, 'kernel': {'running': True, 'pid': 46136, 'port': 4096, 'url': 'http://127.0.0.1:4096', 'version': '1.18.35', 'api': {'health': True, 'session_list': True, 'question': True, 'permission': True}, 'exe': 'C:\\Users\\chris\\AppData\\Local\\npm-global\\node_modules\\opencode-ai\\node_modules\\opencode-windows-x64\\bin\\opencode.exe'}, 'mcp_url': 'http://127.0.0.1:56135/mcp', 'auth': {'success': True, 'provider': 'deepseek', 'source': 'host:custom_api_profiles.json'}, 'assets': None}
+   kernel pid=46136 port=4096 url=http://127.0.0.1:4096
+   会话: ses_ecf6ac3b0ffeYkHm2duY7k9OYj  /  ses_ecf6ac38dffeBF60czijkFB28P
+
+── 1) spawn_tui 是否产出活的 attach 进程 ──
+   启动前 opencode 进程数: 4
+   spawn_tui 返回 pid = 36920
+   启动后 opencode 进程数: 5   新增 1 个
+      pid=36920  cmd=C:\Users\chris\AppData\Local\npm-global\node_modules\opencode-ai\node_modules\opencode-windows-x
+   [PASS] spawn_tui 产出 attach 进程: process discovery 找到 1 个 attach: 36920
+   [PASS] attach pid 与返回值一致: pid=36920
+   [PASS] attach 进程存活: pid=36920 在 tasklist 中=是
+
+── 2) POST /tui/select-session（复用同一窗口切会话） ──
+   [PASS] tui_select_session 返回 true: → True
+   [PASS] 切会话后 TUI pid 不变: 前=36920 后=36920
+
+── 3) POST /tui/show-toast ──
+   [PASS] tui_show_toast 返回 true: → True
+
+── 4) stop_tui 后无残留 ──
+   [PASS] stop_tui 清掉自己 spawn 的 attach: attach pid=36920 仍存活=False（总数 5→4）
+
+── 5) 关闭内核（树杀）── **差分**断言：我 spawn 的应消失，别人的**不得**被杀 ──
+   关闭前：总数=4  我的内核 pid=46136  非我=3
+      [非我] pid=27572  cmd=C:\Users\chris\AppData\Local\npm-global\node_modules\@opencode\cli\bin\ope
+      [非我] pid=43244  cmd="C:\Users\chris\AppData\Local\npm-global\node_modules\opencode-ai\bin\open
+      [非我] pid=19320  cmd="C:\Users\chris\AppData\Local\npm-global\node_modules\opencode-ai\bin\open
+      [我的] pid=46136  cmd=C:\Users\chris\AppData\Local\npm-global\node_modules\opencode-ai\node_modu
+   [PASS] 我 spawn 的内核已消失: pid=46136 仍存活=False
+   [PASS] 未误杀别人的 opencode: 非我进程被杀的: 无
+   [PASS] list_processes 带 cmdline: 有命令行 → 可按参数精确匹配（playbook §8.1 要求）
+
+========================================================================================
+TUI 验证 total=10 passed=10 failed=0
+RESULT: PASS

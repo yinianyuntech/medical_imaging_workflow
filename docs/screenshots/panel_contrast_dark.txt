@@ -1,0 +1,6 @@
+主题=dark
+QLabel	ocTitle	bg=#12161C	fg=#7FD1AE	ratio=10.05	declared=#7FD1AE	160x21
+QLabel	ocStatus	bg=#12161C	fg=#C2CBD6	ratio=11.07	declared=#C2CBD6	1292x21
+QPushButton	启动内核	bg=#262D37	fg=#E6ECF4	ratio=11.68	declared=#E6ECF4	76x21
+QPushButton	停止	bg=#1B2129	fg=#98A2B0	ratio=6.27	declared=#98A2B0	52x21
+QPushButton	展开	bg=#262D37	fg=#E6ECF4	ratio=11.68	declared=#E6ECF4	56x21

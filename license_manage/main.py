@@ -1,7 +1,7 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
+from src.core.qt_compat.QtWidgets import QApplication
+from src.core.qt_compat.QtCore import Qt
 try:
     from .ui import LicenseManager
     from .storage import init_db
@@ -31,7 +31,7 @@ def main():
 
     app = QApplication(sys.argv)
     try:
-        from PyQt5.QtGui import QIcon
+        from src.core.qt_compat.QtGui import QIcon
 
         icon_candidates = []
         if getattr(sys, "frozen", False):

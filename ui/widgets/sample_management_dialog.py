@@ -11,15 +11,15 @@ import os
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QLineEdit, QTextEdit, QTableWidget,
     QTableWidgetItem, QHeaderView, QMessageBox, QGroupBox,
     QComboBox, QDateTimeEdit, QCheckBox, QSplitter,
     QFrame, QScrollArea, QWidget, QFormLayout, QApplication
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QDateTime
-from PyQt5.QtGui import QFont, QIcon, QPalette, QColor
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QDateTime
+from src.core.qt_compat.QtGui import QFont, QIcon, QPalette, QColor
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -27,6 +27,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from src.core.app_config import AppConfig
 from src.core.ui_scale_profile import dialog_target, is_macos
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon
 from src.services.database_service import DatabaseService
 
 
@@ -135,14 +136,17 @@ class SampleManagementDialog(QDialog):
         
         # 操作按钮
         self.add_sample_button = QPushButton("新增样本")
-        self.add_sample_button.setFixedSize(80, 30)
+        self.add_sample_button.setFixedSize(104, 30)
+        apply_icon(self.add_sample_button, "plus", "text", 15)
         
         self.delete_sample_button = QPushButton("删除样本")
-        self.delete_sample_button.setFixedSize(80, 30)
+        self.delete_sample_button.setFixedSize(104, 30)
+        apply_icon(self.delete_sample_button, "trash", "text", 15)
         self.delete_sample_button.setEnabled(False)
         
         self.refresh_button = QPushButton("刷新")
-        self.refresh_button.setFixedSize(60, 30)
+        self.refresh_button.setFixedSize(88, 30)
+        apply_icon(self.refresh_button, "refresh", "text", 15)
         
         header_layout.addWidget(title_label)
         header_layout.addStretch()
@@ -268,14 +272,17 @@ class SampleManagementDialog(QDialog):
         button_layout = QHBoxLayout()
         
         self.save_button = QPushButton("保存")
-        self.save_button.setFixedSize(80, 35)
+        self.save_button.setFixedSize(96, 35)
+        apply_icon(self.save_button, "save", "text", 16)
         self.save_button.setEnabled(False)
         
         self.cancel_button = QPushButton("取消")
-        self.cancel_button.setFixedSize(80, 35)
+        self.cancel_button.setFixedSize(96, 35)
+        apply_icon(self.cancel_button, "close", "text", 16)
         
         self.new_button = QPushButton("新建")
-        self.new_button.setFixedSize(80, 35)
+        self.new_button.setFixedSize(96, 35)
+        apply_icon(self.new_button, "plus", "text", 16)
         
         button_layout.addStretch()
         button_layout.addWidget(self.new_button)

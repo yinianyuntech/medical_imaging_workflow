@@ -3,15 +3,16 @@ import re
 import os
 import urllib.parse
 from pathlib import Path
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QTextBrowser,
     QFrame, QSplitter, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QMessageBox, QProgressBar, QDialog, QCheckBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QThread
-from PyQt5.QtGui import QFont, QColor, QTextCursor, QTextCharFormat
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QThread
+from src.core.qt_compat.QtGui import QFont, QColor, QTextCursor, QTextCharFormat
 
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon
 from src.services.ollama_local_service import OllamaLocalService
 from src.ai.agent_skills.template_fitting import TemplateFitter
 from src.utils.local_template_manager import LocalTemplateManager
@@ -60,7 +61,12 @@ class ScientificPreviewWidget(QWidget):
         self.current_result = None
         self.project_id = None
         from src.services.ollama_local_service import OllamaLocalService
-        self.llm_service = llm_service if llm_service is not None else OllamaLocalService()
+        if llm_service is not None:
+            self.llm_service = llm_service
+        else:
+            # 默认=内嵌 opencode 推理网关（MIMW_INFER_BACKEND=legacy 可回退）
+            from src.kernel.inference_gateway import make_llm_service
+            self.llm_service = make_llm_service(OllamaLocalService)
         self.model = "llama3"
         self.service_label = "Ollama"
         self._format_preview_enabled = False
@@ -86,6 +92,11 @@ class ScientificPreviewWidget(QWidget):
 
     def set_llm_service(self, svc, service_label: str = None, model: str = None):
         self.llm_service = svc
+        try:
+            if svc is not None and hasattr(svc, "set_project") and self.project_id:
+                svc.set_project(self.project_id)
+        except Exception:
+            pass
         if service_label:
             self.service_label = str(service_label)
         if model:
@@ -170,22 +181,23 @@ class ScientificPreviewWidget(QWidget):
         p3_layout.addWidget(self.chat_input)
         
         self.btn_rethink = QPushButton("Rethink Draft (Loop)")
-        self.btn_rethink.setStyleSheet(
-            f"background-color: {'#4A4A4A' if is_dark else '#2E86AB'}; color: {'#F5D0FE' if is_dark else 'white'}; padding: 8px;"
-        )
+        apply_icon(self.btn_rethink, "sparkles", "text", 16)
+        # 不设内联底色：交给光影皮肤绘制（内联浅/深色会被皮肤清理，
+        # 白图标会落到"浅色金属按钮"上，对比度反而变差）
         self.btn_rethink.clicked.connect(self.on_rethink_clicked)
         p3_layout.addWidget(self.btn_rethink)
         
         self.btn_template = QPushButton("TemplateFit Wizard")
-        self.btn_template.setStyleSheet(
-            f"background-color: {'#4A4A4A' if is_dark else '#FF9800'}; color: {'#F5D0FE' if is_dark else 'white'}; padding: 8px;"
-        )
+        apply_icon(self.btn_template, "wand", "text", 16)
         self.btn_template.clicked.connect(self.on_template_clicked)
         self.btn_template.setVisible(False)
         
         self.btn_validate = QPushButton("Validate All (CocoIndex)")
+        apply_icon(self.btn_validate, "check", "on", 16)
         self.btn_validate.setStyleSheet(
-            f"background-color: {'#4A4A4A' if is_dark else '#4CAF50'}; color: {'#F5D0FE' if is_dark else 'white'}; padding: 8px;"
+            "QPushButton { background-color: #2E7D32; color: white; padding: 8px;"
+            " font-weight: 600; border-radius: 6px; }"
+            "QPushButton:hover { background-color: #256428; }"
         )
         self.btn_validate.clicked.connect(self.on_validate_clicked)
         p3_layout.addWidget(self.btn_validate)
@@ -198,18 +210,20 @@ class ScientificPreviewWidget(QWidget):
         
         # --- Complete & Proceed Button ---
         self.btn_finish = QPushButton("Confirm & Proceed to Step 5")
+        apply_icon(self.btn_finish, "arrow-right", "on", 17)
         self.btn_finish.setStyleSheet("""
             QPushButton {
-                background-color: %s; 
-                color: %s; 
+                background-color: #00796B; 
+                color: white; 
                 padding: 12px;
                 font-weight: bold;
                 font-size: 14px;
+                border-radius: 6px;
             }
             QPushButton:hover {
-                background-color: %s;
+                background-color: #00695C;
             }
-        """ % (("#5A5A5A" if is_dark else "#009688"), ("#F5D0FE" if is_dark else "white"), ("#6A6A6A" if is_dark else "#00796B")))
+        """)
         self.btn_finish.clicked.connect(self.on_finish_clicked)
         p3_layout.addWidget(self.btn_finish)
         
@@ -609,6 +623,25 @@ class ScientificPreviewWidget(QWidget):
         
         self.status_label.setText("Draft Loaded.")
 
+        # Step4 = 图文 Word（officeCLI）：后台生成；此后每轮交互记录为 Word 批注
+        self._word_doc_path = ""
+        try:
+            import threading as _th
+            _result_ref = result_dict
+
+            def _build_word_doc():
+                try:
+                    from src.services.step4_word_service import build_step4_docx
+                    p = build_step4_docx(str(self.project_id or ""), _result_ref)
+                    if p:
+                        self._word_doc_path = p
+                except Exception:
+                    pass
+
+            _th.Thread(target=_build_word_doc, daemon=True).start()
+        except Exception:
+            pass
+
     def _refresh_issue_tree(self, units: dict = None):
         self.issue_tree.clear()
         units = units if isinstance(units, dict) else ((self.current_result or {}).get("units", {}) or {})
@@ -923,6 +956,11 @@ class ScientificPreviewWidget(QWidget):
 
     def set_current_project(self, project_id):
         self.project_id = project_id
+        try:
+            if hasattr(self.llm_service, "set_project"):
+                self.llm_service.set_project(project_id)
+        except Exception:
+            pass
 
     def show_context_menu(self, pos):
         """Show context menu with CGR option"""
@@ -959,7 +997,7 @@ class ScientificPreviewWidget(QWidget):
 
     def _copy_to_clipboard(self, s: str):
         try:
-            from PyQt5.QtWidgets import QApplication
+            from src.core.qt_compat.QtWidgets import QApplication
             cb = QApplication.clipboard()
             cb.setText(str(s or ""))
         except Exception:
@@ -1004,6 +1042,50 @@ class ScientificPreviewWidget(QWidget):
                 self._sync_current_result_from_text(self._get_editor_text_for_export())
                 self._rehighlight_quality_markers()
                 self.status_label.setText("Refinement applied.")
+                self._word_round(
+                    comment="[CGR 精修] 研究者对选中片段执行精修并已应用。",
+                    anchor=str(selected_text or "")[:40],
+                    sync=("fragment", str(selected_text or ""),
+                          str(dialog.refined_text or "")))
+
+    # ---------------------------------------------------- Step4 Word（officeCLI）
+
+    def _word_round(self, comment: str = "", anchor: str = "", sync=None) -> None:
+        """一轮交互的 Word 落盘（后台）：批注 + 正文同步（Rethink/局部重写/精修）。
+
+        sync: None | ("full", text) | ("section", heading, text) | ("fragment", old, new)
+        """
+        path = str(getattr(self, "_word_doc_path", "") or "")
+        if not path:
+            return
+        try:
+            import threading as _th
+            from src.services import step4_word_service as _wsvc
+
+            def _job():
+                try:
+                    if comment:
+                        _wsvc.add_feedback_comment(path, str(comment),
+                                                   anchor_text=str(anchor or ""))
+                    if isinstance(sync, tuple) and sync:
+                        kind = str(sync[0])
+                        if kind == "full" and len(sync) >= 2:
+                            _wsvc.sync_full_text(path, str(sync[1] or ""))
+                        elif kind == "section" and len(sync) >= 3:
+                            _wsvc.sync_section_text(path, str(sync[1] or ""),
+                                                    str(sync[2] or ""))
+                        elif kind == "fragment" and len(sync) >= 3:
+                            _wsvc.sync_fragment_text(path, str(sync[1] or ""),
+                                                     str(sync[2] or ""))
+                except Exception:
+                    pass
+
+            _th.Thread(target=_job, daemon=True).start()
+        except Exception:
+            pass
+
+    def _add_word_comment(self, text: str, anchor: str = "") -> None:
+        self._word_round(comment=str(text or ""), anchor=str(anchor or ""))
 
     def show_no_data_state(self):
         """Show warning state when no data is loaded"""
@@ -1273,6 +1355,10 @@ class ScientificPreviewWidget(QWidget):
             if conflict_id:
                 self._logic_audit_state.setdefault("resolved", set()).add(conflict_id)
             self.status_label.setText(f"{target_heading} 已更新。")
+            self._word_round(
+                comment=f"[局部重写] 章节「{target_heading}」已按真实数据进行重写并应用。",
+                anchor=str(target_heading or ""),
+                sync=("section", str(target_heading or ""), str(new_body or "")))
         finally:
             self._cleanup_worker()
 
@@ -1553,6 +1639,7 @@ class ScientificPreviewWidget(QWidget):
                 return rewritten
             return _task_generic(text, user_instruction, llm_service, model)
 
+        self._last_rethink_instruction = str(instruction or "")
         self.worker = LLMWorker(_task, base_text, instruction, self.llm_service, self.model)
         self.worker.finished.connect(self._on_rethink_done)
         self.worker.error.connect(self._on_llm_error)
@@ -1572,6 +1659,10 @@ class ScientificPreviewWidget(QWidget):
             self._set_editor_text(new_text)
             self._sync_current_result_from_text(new_text)
             self.status_label.setText(f"Rethink complete. (Time: {duration:.1f}s)")
+            self._word_round(
+                comment=(f"[Rethink 第 N 轮] 指令：{getattr(self, '_last_rethink_instruction', '')[:400]}"
+                         f"\n→ 已按指令重写全文并应用。"),
+                sync=("full", str(new_text or "")))
         finally:
             self._cleanup_worker()
         
@@ -1593,7 +1684,7 @@ class ScientificPreviewWidget(QWidget):
 
     def on_template_clicked(self):
         """Start TemplateFit Wizard"""
-        from PyQt5.QtWidgets import QDialog, QComboBox, QDialogButtonBox, QLineEdit, QHBoxLayout, QFileDialog
+        from src.core.qt_compat.QtWidgets import QDialog, QComboBox, QDialogButtonBox, QLineEdit, QHBoxLayout, QFileDialog
         import os
         
         # 1. Dialog for Template Selection
@@ -1607,6 +1698,7 @@ class ScientificPreviewWidget(QWidget):
         search_input = QLineEdit()
         search_input.setPlaceholderText("Search templates (Local or Online)...")
         search_btn = QPushButton("Search")
+        apply_icon(search_btn, "search", "text", 15)
         search_layout.addWidget(search_input)
         search_layout.addWidget(search_btn)
         layout.addLayout(search_layout)
@@ -1617,6 +1709,7 @@ class ScientificPreviewWidget(QWidget):
         combo_layout = QHBoxLayout()
         combo = QComboBox()
         browse_btn = QPushButton("Open from Disk...")
+        apply_icon(browse_btn, "folder-open", "text", 15)
         combo_layout.addWidget(combo, 1) # stretch
         combo_layout.addWidget(browse_btn)
         layout.addLayout(combo_layout)
@@ -1950,6 +2043,7 @@ class ScientificPreviewWidget(QWidget):
         # Metadata to pass along
         metadata = {
             "model": self.model,
+            "word_doc_path": str(getattr(self, "_word_doc_path", "") or ""),
             "source": "Step 4 Preview",
             "timestamp": "now", # receiver will handle formatting
             # Pass correct title if available from Step 3

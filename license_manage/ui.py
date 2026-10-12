@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QDateTimeEdit, QTextEdit, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox
-from PyQt5.QtCore import QDateTime
+from src.core.qt_compat.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QDateTimeEdit, QTextEdit, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox
+from src.core.qt_compat.QtCore import QDateTime
 import time
 from .hardware import get_cpu_fingerprint
 from .license_crypto import generate_license, verify_license

@@ -1,0 +1,86 @@
+auth.json providers = ['deepseek']
+kernel url = http://127.0.0.1:51216  pid=8120
+
+=== 3) 内核眼里的 MCP 工具面 ===
+┌  MCP Servers
+│
+●  ✓ medwork connected
+│      http://127.0.0.1:54026/mcp
+│
+└  1 server(s)
+session = ses_ed1c6df13ffeljTg2OSCPcoyRD
+
+=== 1) 原始 POST /session/:id/message 返回 ===
+{
+ "info": {
+  "parentID": "msg_12e39211a001UxA7LzuPyYdHHK",
+  "role": "assistant",
+  "mode": "build",
+  "agent": "build",
+  "path": {
+   "cwd": "F:\\RSNA\\medical_imaging_workflow_release",
+   "root": "F:\\RSNA\\medical_imaging_workflow_release"
+  },
+  "cost": 0,
+  "tokens": {
+   "input": 0,
+   "output": 0,
+   "reasoning": 0,
+   "cache": {
+    "read": 0,
+    "write": 0
+   }
+  },
+  "modelID": "deepseek-flash",
+  "providerID": "deepseek",
+  "time": {
+   "created": 1791776858711,
+   "completed": 1791776860986
+  },
+  "error": {
+   "name": "APIError",
+   "data": {
+    "message": "Authentication Fails, Your api key: ****0000 is invalid (request_id: 938d80a9-b247-47d9-8cb8-2a6889ba8742)",
+    "statusCode": 401,
+    "isRetryable": false,
+    "responseHeaders": {
+     "access-control-allow-credentials": "true",
+     "connection": "keep-alive",
+     "content-length": "204",
+     "content-type": "application/json",
+     "date": "Mon, 12 Oct 2026 03:47:41 GMT",
+     "eo-cache-status": "MISS",
+     "eo-log-uuid": "15371621159810529338",
+     "server": "openresty",
+     "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+     "vary": "origin, access-control-request-method, access-control-request-headers",
+     "x-content-type-options": "nosniff",
+     "x-ds-trace-id": "92e159ee0b2256fcc6093d61bb852760"
+    },
+    "responseBody": "{\"error\":{\"message\":\"Authentication Fails, Your api key: ****0000 is invalid (request_id: 938d80a9-b247-47d9-8cb8-2a6889ba8742)\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}",
+    "metadata": {
+     "url": "https://api.deepseek.com/chat/completions"
+    }
+   }
+  },
+  "id": "msg_12e392257001oJGZP1eWxrEG7p",
+  "sessionID": "ses_ed1c6df13ffeljTg2OSCPcoyRD"
+ },
+ "parts": []
+}
+
+=== 2) 该会话的消息列表 ===
+  消息数 = 2
+  --- role=user finish=None error=None parts=1
+      [text] 请只回答两个字：收到
+  --- role=assistant finish=None error={'name': 'APIError', 'data': {'message': 'Authentication Fails, Your api key: ****0000 is invalid (request_id: 938d80a9-b247-47d9-8cb8-2a6889ba8742)', 'statusCode': 401, 'isRetryable': False, 'responseHeaders': {'access-control-allow-credentials': 'true', 'connection': 'keep-alive', 'content-length': '204', 'content-type': 'application/json', 'date': 'Mon, 12 Oct 2026 03:47:41 GMT', 'eo-cache-status': 'MISS', 'eo-log-uuid': '15371621159810529338', 'server': 'openresty', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload', 'vary': 'origin, access-control-request-method, access-control-request-headers', 'x-content-type-options': 'nosniff', 'x-ds-trace-id': '92e159ee0b2256fcc6093d61bb852760'}, 'responseBody': '{"error":{"message":"Authentication Fails, Your api key: ****0000 is invalid (request_id: 938d80a9-b247-47d9-8cb8-2a6889ba8742)","type":"authentication_error","param":null,"code":"invalid_request_error"}}', 'metadata': {'url': 'https://api.deepseek.com/chat/completions'}}} parts=0
+
+=== 4) 内核日志里 error/auth/provider 相关行 ===
+   timestamp=2026-10-12T03:46:49.466Z level=INFO run=5cd54cdb message="shell tool using shell" shell="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE"
+   timestamp=2026-10-12T03:47:35.401Z level=INFO run=e2c46854 message="all LSPs are disabled"
+   timestamp=2026-10-12T03:47:39.228Z level=INFO run=e2c46854 message=tracking hash=8b0c1b064017825816c292144a80c1db77a0934a cwd="F:\\RSNA\\medical_imaging_workflow_release" git="C:\\Users\\chris\\AppDat
+   timestamp=2026-10-12T03:47:39.269Z level=INFO run=e2c46854 message="shell tool using shell" shell="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE"
+   timestamp=2026-10-12T03:47:40.555Z level=INFO run=e2c46854 message=stream providerID=deepseek modelID=deepseek-flash session.id=ses_ed1c6df13ffeljTg2OSCPcoyRD small=false agent=build mode=primary
+   timestamp=2026-10-12T03:47:40.561Z level=INFO run=e2c46854 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=deepseek llm.model=deepseek-flash
+   timestamp=2026-10-12T03:47:40.730Z level=ERROR run=e2c46854 message="stream error" providerID=deepseek modelID=deepseek-flash session.id=ses_ed1c6df13ffeljTg2OSCPcoyRD small=false agent=build mode=pri
+   timestamp=2026-10-12T03:47:40.733Z level=ERROR run=e2c46854 message=process session.id=ses_ed1c6df13ffeljTg2OSCPcoyRD messageID=msg_12e392257001oJGZP1eWxrEG7p error="Authentication Fails, Your api key

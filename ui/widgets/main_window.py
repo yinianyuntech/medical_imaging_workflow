@@ -13,14 +13,14 @@ import re
 import hashlib
 import urllib.parse
 from pathlib import Path
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QStackedWidget, QPushButton, QLabel, QFrame,
     QMenuBar, QStatusBar, QAction, QMessageBox, QDialog,
     QGridLayout, QSizePolicy
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPoint, QTimer, QThread
-from PyQt5.QtGui import QIcon, QFont, QPalette, QColor
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QSize, QPoint, QTimer, QThread
+from src.core.qt_compat.QtGui import QIcon, QFont, QPalette, QColor
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -40,6 +40,8 @@ from src.utils.logger import get_logger
 from src.utils.gpu_manager import gpu_manager
 from ui.widgets.license_activation_dialog import LicenseActivationDialog
 from src.services.project_service import ProjectService
+from src.utils import app_icons
+from src.utils.app_icons import apply_icon, icon, icon_pixmap
 
 
 class SklearnBackfillWorker(QThread):
@@ -97,6 +99,55 @@ class SklearnBackfillWorker(QThread):
         self.finished_report.emit(report)
 
 
+class PageStack(QStackedWidget):
+    """QStackedWidget，额外支持**用原始页面控件切页**。
+
+    ⚠️ 为什么必须要有这个类（血泪教训）
+
+    防遮挡改造把每一页包进 QScrollArea 之后再 `addWidget`（见 `_wrap_page_in_scroll`），
+    于是栈里存的是**滚动容器**。而全工程的切页调用写的是：
+
+        self.stacked_widget.setCurrentWidget(self.dicom_roi_widget)   # 原始控件
+
+    `QStackedWidget::setCurrentWidget()` 内部靠 `indexOf(w)` 定位，找不到就**静默不动**
+    —— 不报错、不抛异常、不返回错误。后果：**9 处切页调用全部失效**，
+    所有步骤菜单/按钮点下去都"没反应"（只有状态栏文字变了）。
+
+    为什么之前的排查没发现：排查台用的是 `setCurrentIndex(idx)`，
+    **它照样能工作**，完全绕过了这个问题 —— 又一次"工具绕开真实路径"的教训。
+
+    这里补一张"原始控件 → 容器"的映射，让两种写法都能切页，
+    **不必改任何调用点**（避免动到业务代码）。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._page_owner = {}
+
+    def register_page(self, raw, holder) -> None:
+        """登记"原始页面控件 → 实际入栈的容器"。"""
+        try:
+            self._page_owner[id(raw)] = holder
+        except Exception:
+            pass
+
+    def holder_of(self, w):
+        if w is None:
+            return None
+        try:
+            if self.indexOf(w) >= 0:
+                return w
+        except Exception:
+            pass
+        return self._page_owner.get(id(w))
+
+    def setCurrentWidget(self, w):  # noqa: N802 - 保持 Qt 命名
+        h = self.holder_of(w)
+        if h is not None:
+            return super().setCurrentWidget(h)
+        return super().setCurrentWidget(w)
+
+
 class MainWindow(QMainWindow):
     """
     主窗口类
@@ -130,7 +181,7 @@ class MainWindow(QMainWindow):
         设置窗口几何，支持多显示器环境
         """
         try:
-            from PyQt5.QtWidgets import QDesktopWidget
+            from src.core.qt_compat.QtWidgets import QDesktopWidget
             desktop = QDesktopWidget()
             primary_screen = desktop.primaryScreen()
             screen_geometry = desktop.screenGeometry(primary_screen)
@@ -262,6 +313,25 @@ class MainWindow(QMainWindow):
                     self.license_label.setText("开源版（未启用授权校验）")
             except Exception:
                 pass
+
+        # === 光影拟物化：清理与全局皮肤冲突的局部硬编码样式 ===
+        # 各步骤页面大量使用内联 setStyleSheet（浅色主题遗留），会覆盖全局 QSS。
+        # 此处统一清理"浅色外壳色"，但保留带功能性语义色（成功/危险/警告）的样式。
+        try:
+            from src.utils.skeuomorphic import (strip_conflicting_stylesheets,
+                                                ensure_text_fits, apply_data_font)
+            self._skin_report = strip_conflicting_stylesheets(self)
+            # 数值型文本切等宽数据字体（仪表感）
+            self._skin_report.update(apply_data_font(self))
+            # 字号被皮肤放大后，自动把装不下文字的标签撑到够高（防裁字）
+            self._skin_report.update(ensure_text_fits(self))
+            self.logger.info(f"光影皮肤样式清理: {self._skin_report}")
+        except Exception as _skin_e:
+            self._skin_report = {}
+            try:
+                self.logger.warning(f"光影皮肤样式清理失败: {_skin_e}")
+            except Exception:
+                pass
     
     def create_title_bar(self, parent_layout):
         """
@@ -271,8 +341,24 @@ class MainWindow(QMainWindow):
             parent_layout: 父布局
         """
         title_frame = QFrame()
+        title_frame.setObjectName("mimwTitleBar")
         title_frame.setFixedHeight(80)
-        title_frame.setStyleSheet("""
+        # 光影拟物：金属拉丝标题栏（MIMW_SKIN=off 可回退原蓝色）
+        # 注意：不给标题栏加 QGraphicsDropShadowEffect —— 在带样式表的布局子控件上
+        # 会产生硬边阴影残影；深度改用上下描边渐变表达。
+        try:
+            from src.utils.skeuomorphic import SKIN_ENABLED, title_bar_qss
+            if SKIN_ENABLED:
+                title_frame.setStyleSheet(title_bar_qss())
+            else:
+                title_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2E86AB;
+                border: none;
+            }
+        """)
+        except Exception:
+            title_frame.setStyleSheet("""
             QFrame {
                 background-color: #2E86AB;
                 border: none;
@@ -284,11 +370,45 @@ class MainWindow(QMainWindow):
         title_layout = QHBoxLayout(title_frame)
         title_layout.setContentsMargins(20, 10, 20, 10)
         
+        # 应用徽标（矢量绘制，主题自适应；避免把 1024px 位图缩成 24px 的糊图）
+        self._logo_label = QLabel()
+        self._logo_label.setFixedSize(38, 38)
+        try:
+            self._logo_label.setPixmap(icon_pixmap("medcross", "accent", 24))
+        except Exception:
+            pass
+        self._logo_label.setAlignment(Qt.AlignCenter)
+        self._refresh_logo_chip()
+        title_layout.addWidget(self._logo_label)
+        title_layout.addSpacing(10)
+        
         # 应用程序标题
         # Force title update regardless of config cache
         app_title = '医疗数据科学结构化工作流系统（Designed by Christ.paul90@gmail.com. All rights reserved.）'
         title_label = QLabel(app_title)
-        title_label.setStyleSheet("""
+        title_label.setObjectName("mimwTitleText")
+        # 注意：不给标题栏文字加 QGraphicsDropShadowEffect —— 会让 Qt 把父级背景
+        # 重新栅格化，导致拉丝贴图在其边界处出现色差接缝（渲染伪影）。
+        # 浮雕感改由"亮字色 + 金属底"直接表达。
+        try:
+            from src.utils.skeuomorphic import (SKIN_ENABLED, title_bar_foreground_qss,
+                                                ui_font, SIZE_TITLE)
+            if SKIN_ENABLED:
+                title_label.setStyleSheet(title_bar_foreground_qss())
+                # 字距/族只走 QFont（QSS 不支持 letter-spacing）
+                title_label.setFont(ui_font(SIZE_TITLE, 800, display=True,
+                                            letter_spacing=0.9))
+            else:
+                title_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 24px;
+                font-weight: bold;
+                font-family: 'Microsoft YaHei';
+            }
+        """)
+        except Exception:
+            title_label.setStyleSheet("""
             QLabel {
                 color: white;
                 font-size: 24px;
@@ -299,7 +419,24 @@ class MainWindow(QMainWindow):
         
         # 项目信息标签
         self.project_info_label = QLabel("未选择项目")
-        self.project_info_label.setStyleSheet("""
+        self.project_info_label.setObjectName("mimwProjectText")
+        try:
+            from src.utils.skeuomorphic import (SKIN_ENABLED, title_bar_foreground_qss,
+                                                ui_font, SIZE_DIM)
+            if SKIN_ENABLED:
+                self.project_info_label.setStyleSheet(title_bar_foreground_qss())
+                self.project_info_label.setFont(ui_font(SIZE_DIM, 500,
+                                                        letter_spacing=0.4))
+            else:
+                self.project_info_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 14px;
+                font-family: 'Microsoft YaHei';
+            }
+        """)
+        except Exception:
+            self.project_info_label.setStyleSheet("""
             QLabel {
                 color: white;
                 font-size: 14px;
@@ -313,6 +450,19 @@ class MainWindow(QMainWindow):
         
         parent_layout.addWidget(title_frame)
     
+    def _refresh_logo_chip(self):
+        """按当前主题重绘标题栏徽标（底片 + 矢量图标）。"""
+        try:
+            from src.utils.skeuomorphic import current_palette
+            p = current_palette()
+            self._logo_label.setPixmap(icon_pixmap("medcross", "accent_hi", 22))
+            self._logo_label.setStyleSheet(
+                f"background: {p.hl_soft}; border: 1px solid {p.edge_hi};"
+                f" border-radius: 10px;"
+            )
+        except Exception:
+            pass
+    
     def create_content_area(self, parent_layout):
         """
         创建内容区域
@@ -320,8 +470,12 @@ class MainWindow(QMainWindow):
         Args:
             parent_layout: 父布局
         """
+        from src.core.qt_compat.QtWidgets import QScrollArea
+        
         # 创建堆叠部件来管理不同的界面
-        self.stacked_widget = QStackedWidget()
+        # 用 PageStack：支持 show_* 里 `setCurrentWidget(原始控件)` 的写法
+        # （页面被包进 QScrollArea 后，普通 QStackedWidget 会静默切不动页）
+        self.stacked_widget = PageStack()
         
         # 创建各个功能界面
         self.project_management_widget = ProjectManagementWidget()
@@ -337,18 +491,46 @@ class MainWindow(QMainWindow):
         from ui.widgets.data_cleaning_widget import DataCleaningWidget
         self.data_cleaning_widget = DataCleaningWidget()
         
-        # 添加到堆叠部件
-        self.stacked_widget.addWidget(self.project_management_widget)
-        self.stacked_widget.addWidget(self.dicom_roi_widget)
-        self.stacked_widget.addWidget(self.text_processing_widget)
-        self.stacked_widget.addWidget(self.ocr_recognition_widget)
-        self.stacked_widget.addWidget(self.magic_seg_widget)
-        self.stacked_widget.addWidget(self.data_cleaning_widget)
-        self.stacked_widget.addWidget(self.ai_summary_widget)
-        self.stacked_widget.addWidget(self.text_preview_widget)
-        self.stacked_widget.addWidget(self.feedback_optimization_widget)
+        # === 防遮挡：每页包一层滚动区 ===
+        # 部分页面 minimumSizeHint 很高（如文本处理 1090px），直接放进 QStackedWidget 会把
+        # 主窗口的最小高度顶到 1224px，在 1080p 屏幕上底部（状态栏/面板下沿）会被屏幕裁掉。
+        # 包进 QScrollArea 后：窗口可自由缩小，内容改为滚动，任何尺寸下都不出现遮挡。
+        self.page_views = {}
+        for w in (
+            self.project_management_widget,
+            self.dicom_roi_widget,
+            self.text_processing_widget,
+            self.ocr_recognition_widget,
+            self.magic_seg_widget,
+            self.data_cleaning_widget,
+            self.ai_summary_widget,
+            self.text_preview_widget,
+            self.feedback_optimization_widget,
+        ):
+            view = self._wrap_page_in_scroll(w)
+            self.page_views[type(w).__name__] = view
+            self.stacked_widget.addWidget(view)
+            try:
+                self.stacked_widget.register_page(w, view)
+            except Exception:
+                pass
         
         parent_layout.addWidget(self.stacked_widget)
+
+    def _wrap_page_in_scroll(self, widget):
+        """把页面控件包进滚动容器，避免其最小尺寸顶高主窗口（消除屏幕遮挡）。"""
+        from src.core.qt_compat.QtWidgets import QScrollArea
+
+        sa = QScrollArea()
+        sa.setObjectName(f"pageScroll_{type(widget).__name__}")
+        sa.setWidgetResizable(True)
+        sa.setFrameShape(QFrame.NoFrame)
+        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sa.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # 滚动区自身的最小尺寸要小，否则仍会顶高窗口
+        sa.setMinimumSize(0, 0)
+        sa.setWidget(widget)
+        return sa
     
     def create_menu_bar(self):
         """
@@ -357,11 +539,15 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         
         # 文件菜单
+        # ⚠️ 菜单栏**不放图标**：Qt 的 QCommonStyle 对"带图标的菜单栏项"只画图标、
+        #    丢弃文字（实测 42px vs 纯文字 98px）→ 一级菜单会变成一排无字图标。
+        #    导航图标全部放在**下拉菜单项**里（QMenu::item 图标+文字都画）。
         file_menu = menubar.addMenu('系统(&F)')
         
         exit_action = QAction('退出(&X)', self)
         exit_action.setShortcut('Ctrl+Q')
         exit_action.triggered.connect(self.close)
+        apply_icon(exit_action, "close", "dim")
         file_menu.addAction(exit_action)
         
         # 功能菜单
@@ -370,22 +556,27 @@ class MainWindow(QMainWindow):
         project_mgmt_action = QAction('项目管理(&P)', self)
         project_mgmt_action.setShortcut('Ctrl+P')
         project_mgmt_action.triggered.connect(self.show_project_management)
+        apply_icon(project_mgmt_action, "home")
         function_menu.addAction(project_mgmt_action)
         
         dicom_action = QAction('DICOM ROI识别(&D)', self)
         dicom_action.triggered.connect(self.show_dicom_roi)
+        apply_icon(dicom_action, "image")
         function_menu.addAction(dicom_action)
         
         text_action = QAction('文本处理(&T)', self)
         text_action.triggered.connect(self.show_text_processing)
+        apply_icon(text_action, "file-text")
         function_menu.addAction(text_action)
         
         ocr_action = QAction('OCR识别(&O)', self)
         ocr_action.triggered.connect(self.show_ocr_recognition)
+        apply_icon(ocr_action, "scan-text")
         function_menu.addAction(ocr_action)
         
         magic_seg_action = QAction('Magic Seg(&M)', self)
         magic_seg_action.triggered.connect(self.show_magic_seg)
+        apply_icon(magic_seg_action, "layers")
         function_menu.addAction(magic_seg_action)
         
         # Add Step 2 menu
@@ -393,6 +584,7 @@ class MainWindow(QMainWindow):
         
         sample_action = QAction('样本管理(&S)', self)
         sample_action.triggered.connect(self.show_sample_management)
+        apply_icon(sample_action, "database")
         function_menu.addAction(sample_action)
         
         # 第二步数据清洗及结构化菜单
@@ -401,12 +593,14 @@ class MainWindow(QMainWindow):
         # 添加数据清洗功能
         data_cleaning_action = QAction('数据清洗及结构化(&D)', self)
         data_cleaning_action.triggered.connect(self.show_data_cleaning)
+        apply_icon(data_cleaning_action, "sparkles")
         data_cleaning_menu.addAction(data_cleaning_action)
         
         # 第三步本地大模型数据科学总结菜单
         ai_summary_menu = menubar.addMenu('第三步本地大模型数据科学总结(&A)')
         ai_summary_action = QAction('数据科学总结(&A)', self)
         ai_summary_action.triggered.connect(self.show_ai_summary)
+        apply_icon(ai_summary_action, "cpu")
         ai_summary_menu.addAction(ai_summary_action)
         
         # 第四步科学文本预览生成菜单
@@ -416,6 +610,7 @@ class MainWindow(QMainWindow):
         self.text_preview_action = QAction('预览生成(&P)', self)
         # self.text_preview_action.setEnabled(False) # Removed blocking
         self.text_preview_action.triggered.connect(self.show_text_preview)
+        apply_icon(self.text_preview_action, "flask")
         text_preview_menu.addAction(self.text_preview_action)
         
         # 第五步科学文本研究者真实反馈及迭代优化菜单
@@ -425,6 +620,7 @@ class MainWindow(QMainWindow):
         self.feedback_action = QAction('迭代优化仪表盘(&D)', self)
         # self.feedback_action.setEnabled(False) # Removed blocking for testing
         self.feedback_action.triggered.connect(self.show_feedback_optimization)
+        apply_icon(self.feedback_action, "chart")
         feedback_optimization_menu.addAction(self.feedback_action)
         
         # 帮助菜单
@@ -434,14 +630,17 @@ class MainWindow(QMainWindow):
         view_menu = menubar.addMenu('视图(&V)')
         self.theme_action = QAction('切换深色/浅色主题', self)
         self.theme_action.triggered.connect(self.toggle_theme)
+        apply_icon(self.theme_action, "theme")
         view_menu.addAction(self.theme_action)
         
         about_action = QAction('关于(&A)', self)
         about_action.triggered.connect(self.show_about)
+        apply_icon(about_action, "info")
         help_menu.addAction(about_action)
 
         setup_action = QAction('环境初始化(&I)…', self)
         setup_action.triggered.connect(self.show_setup)
+        apply_icon(setup_action, "settings")
         help_menu.addSeparator()
         help_menu.addAction(setup_action)
     
@@ -481,52 +680,193 @@ class MainWindow(QMainWindow):
     
     def toggle_theme(self):
         """
-        切换全局明暗主题
+        切换全局明暗主题（**热更新，无需重启进程**）
         """
-        from PyQt5.QtWidgets import QApplication
         from src.utils.theme_manager import ThemeManager
-        import subprocess
-        import sys
-        
+
         current = ThemeManager.get_current_theme()
         new_theme = "light" if current == "dark" else "dark"
-        
-        # Update config and save to disk
+
+        # 落盘，下次启动沿用
         self.config.set("theme", new_theme)
         if hasattr(self.config, 'save'):
             self.config.save()
-        
-        # Require restart to fully apply (since many widgets have hardcoded styles applied on init)
-        from PyQt5.QtWidgets import QMessageBox
-        reply = QMessageBox.question(
-            self,
-            "切换主题",
-            f"您已选择切换到 {'浅色' if new_theme == 'light' else '深色'} 主题。\n\n由于大量组件样式在启动时生成，主题切换需要重启程序才能完全生效。\n\n是否立即重启程序？",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
-        )
-        
-        if reply == QMessageBox.Yes:
-            # Restart app
-            import os
-            self.logger.info(f"Restarting app to apply new theme: {new_theme}")
-            
-            # Close all windows
-            QApplication.instance().quit()
-            
-            # Relaunch
-            if getattr(sys, 'frozen', False):
-                subprocess.Popen([sys.executable] + sys.argv[1:])
-            else:
-                subprocess.Popen([sys.executable, sys.argv[0]] + sys.argv[1:])
-            
-            # Force exit current process immediately
-            os._exit(0)
+
+        ok = self.apply_theme_live(new_theme)
+        name = "浅色" if new_theme == "light" else "深色"
+        if ok:
+            self.logger.info(f"主题已热切换为: {new_theme}")
+            try:
+                self.status_bar.showMessage(f"已切换为{name}主题（热更新，无需重启）", 6000)
+            except Exception:
+                pass
+        else:
+            from src.core.qt_compat.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "切换失败",
+                                "主题热更新失败，请重启程序以应用新主题。")
+
+    def apply_theme_live(self, theme: str) -> bool:
+        """运行时热切换主题。
+
+        顺序很重要：
+          1) ThemeManager 铺底（qdarkstyle / palette）
+          2) **清材质缓存** —— 颗粒贴图按主题分文件，不清会沿用上一主题
+          3) 皮肤主样式表（会重建材质文件 + 生成新 QSS）
+          4) 重装 3D 绘制引擎（确保 proxy 链在位）
+          5) 重刷主题相关内联样式（三步均幂等）
+          6) 调用控件的 refresh_theme() 协议
+          7) 主窗口壳层 apply_styles()
+          8) 全树 unpolish/polish + 重绘
+        """
+        try:
+            from src.core.qt_compat.QtWidgets import QApplication
+            from src.utils.theme_manager import ThemeManager
+            from src.utils import skeuo_style as st
+            from src.utils import skeuomorphic as sk
+
+            app = QApplication.instance()
+            if app is None:
+                return False
+
+            ThemeManager.apply_theme(app, theme)
+            st.reset_texture_cache()
+            sk.apply_global(app)
+            st.install(app)
+
+            self._skin_report = sk.strip_conflicting_stylesheets(self)
+            self._skin_report.update(sk.apply_data_font(self))
+            self._skin_report.update(sk.ensure_text_fits(self))
+
+            # 控件的主题刷新协议（可选实现）
+            for w in app.allWidgets():
+                fn = getattr(w, "refresh_theme", None)
+                if callable(fn):
+                    try:
+                        fn()
+                    except Exception:
+                        pass
+
+            # 矢量图标全量重绘（换主题必须换描边色）
+            try:
+                app_icons.refresh_all()
+            except Exception:
+                pass
+
+            self.apply_styles()
+            self._repolish_all()
+            self._push_opencode_status()
+            return True
+        except Exception as e:
+            try:
+                self.logger.error(f"主题热更新失败: {e}")
+            except Exception:
+                pass
+            return False
+
+    def _repolish_all(self) -> None:
+        """强制全树重新 polish + 重绘。
+
+        改样式表/QSS 后，仅靠 Qt 自身的 re-polish 有时不会立刻反映到已显示控件，
+        显式 unpolish→polish→update 最稳。
+        """
+        from src.core.qt_compat.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is None:
+            return
+        for w in app.allWidgets():
+            try:
+                w.style().unpolish(w)
+                w.style().polish(w)
+                w.update()
+            except Exception:
+                continue
+        try:
+            self.update()
+            self.repaint()
+            app.processEvents()
+        except Exception:
+            pass
 
     def apply_styles(self):
         """
         应用样式
+
+        光影拟物化皮肤由 `src/utils/skeuomorphic.py` 统一下发；此处只处理
+        主窗口自身的壳层（背景/菜单栏/状态栏），并在皮肤关闭时回退旧样式。
         """
+        try:
+            from src.utils.skeuomorphic import SKIN_ENABLED, current_palette, title_bar_qss, ensure_materials
+            if SKIN_ENABLED:
+                p = current_palette()
+                # ---- 液态玻璃（浅色）：整窗铺「环境背景」，菜单栏/状态栏换亮玻璃 ----
+                if p.name == "light":
+                    mat = ensure_materials(p)
+                    backdrop = f"url({mat['backdrop']})" if mat.get("backdrop") else "none"
+                    win_bg = f"border-image: {backdrop} 0 0 0 0 stretch stretch;"
+                    menubar_bg = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                                  "stop:0 rgba(255,255,255,0.90),"
+                                  "stop:1 rgba(226,238,251,0.68))")
+                    menubar_line = "rgba(132,160,200,0.55)"
+                    mb_sel = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                              "stop:0 rgba(255,255,255,0.98),"
+                              "stop:1 rgba(208,226,248,0.80))")
+                    mb_sel_border = "rgba(255,255,255,1.0)"
+                    status_bg = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                                 "stop:0 rgba(255,255,255,0.88),"
+                                 "stop:1 rgba(226,238,251,0.70))")
+                else:
+                    win_bg = (f"background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                              f"stop:0 {p.s700}, stop:0.45 {p.s800}, stop:1 {p.s900});")
+                    menubar_bg = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                                  f"stop:0 {p.s600}, stop:0.5 {p.s700}, stop:1 {p.s800})")
+                    menubar_line = p.s900
+                    # 深色：菜单栏悬停=金晕（强调色）；浅色分支不动
+                    mb_sel = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                              "stop:0 rgba(255,214,120,0.30), stop:1 rgba(255,214,120,0.10))")
+                    mb_sel_border = p.edge_hi
+                    status_bg = ("qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                                 f"stop:0 {p.s700}, stop:1 {p.s800})")
+                self.setStyleSheet(f"""
+                    QMainWindow {{
+                        {win_bg}
+                    }}
+                    QMenuBar {{
+                        background: {menubar_bg};
+                        border-bottom: 1px solid {menubar_line};
+                    }}
+                    QMenuBar::item {{ background: transparent; padding: 5px 11px; border-radius: 5px; }}
+                    QMenuBar::item:selected {{
+                        background: {mb_sel};
+                        border-top: 1px solid {mb_sel_border};
+                    }}
+                    QStatusBar {{
+                        background: {status_bg};
+                        border-top: 1px solid {p.hl_soft};
+                        color: {p.text_dim};
+                    }}
+                """ + title_bar_qss(p))
+                # 标题/项目标签的文字色也要随主题刷新
+                try:
+                    from src.utils.skeuomorphic import title_bar_foreground_qss
+                    fg = title_bar_foreground_qss(p)
+                    tb = getattr(self, "_title_frame", None)
+                    if tb is not None:
+                        for lb in tb.findChildren(QLabel):
+                            if lb.objectName() in ("mimwTitleText", "mimwProjectText"):
+                                lb.setStyleSheet(fg)
+                    # 徽标芯片（底色 + 矢量图标）同样按新主题重绘
+                    self._refresh_logo_chip()
+                except Exception:
+                    pass
+                return
+        except Exception as _e:
+            try:
+                self.logger.warning(f"光影皮肤应用失败，回退旧样式: {_e}")
+            except Exception:
+                pass
+
+        # ---- 回退：原浅色样式 ----
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #F5F5F5;
@@ -562,7 +902,32 @@ class MainWindow(QMainWindow):
         self.project_management_widget.batch_process_requested.connect(self.on_batch_process_requested)
         if hasattr(self.data_cleaning_widget, 'project_selected'):
             self.data_cleaning_widget.project_selected.connect(self.on_data_cleaning_project_selected)
-        
+
+        # ⚠️ 必须补一次**初始项目同步**（否则步骤菜单点不动）。
+        #
+        # 项目组件在**构造期**就会自动选中上次的项目并 `emit project_switched`：
+        #     ProjectManagementWidget.__init__ → load_projects() → select_project()
+        #         → project_switched.emit(...)          ← 此刻本窗口还没 connect
+        # 而 connect 发生在这里（更晚）→ **那次信号永久丢失**，于是：
+        #     · self.current_project_id 一直是 None
+        #     · show_dicom_roi / show_text_processing / show_ocr_recognition /
+        #       show_ai_summary / show_sample_management 全部只弹
+        #       「请先选择项目！」然后 return，**不切页**
+        #     → 用户感受就是"点菜单/按钮没响应"（必须手动点一次项目列表才恢复）
+        #
+        # 这里在 connect 之后主动同步一次把丢失的那次补回来。幂等：重复调用无害。
+        try:
+            _cur = getattr(self.project_management_widget, "current_project", None)
+            _pid = getattr(_cur, "project_id", None)
+            if _pid:
+                self.on_project_switched(_pid)
+                self.logger.info(f"初始项目同步（补齐构造期丢失的 project_switched）: {_pid}")
+        except Exception as _e:  # noqa: BLE001
+            try:
+                self.logger.warning(f"初始项目同步失败: {_e}")
+            except Exception:
+                pass
+
         # Connect AI Summary completion to Text Preview enabling
         self.ai_summary_widget.analysis_completed.connect(self.enable_text_preview)
         
@@ -575,14 +940,14 @@ class MainWindow(QMainWindow):
             pass
     
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and event.pos().y() <= 80:
+        if event.button() == Qt.LeftButton and event.position().y() <= 80:
             self._drag_active = True
-            self._drag_offset = event.globalPos() - self.frameGeometry().topLeft()
+            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
         super().mousePressEvent(event)
     
     def mouseMoveEvent(self, event):
         if self._drag_active:
-            self.move(event.globalPos() - self._drag_offset)
+            self.move(event.globalPosition().toPoint() - self._drag_offset)
         super().mouseMoveEvent(event)
     
     def mouseReleaseEvent(self, event):
@@ -591,14 +956,14 @@ class MainWindow(QMainWindow):
         super().mouseReleaseEvent(event)
     
     def eventFilter(self, obj, event):
-        from PyQt5.QtCore import QEvent
+        from src.core.qt_compat.QtCore import QEvent
         if obj is getattr(self, "_title_frame", None):
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
                 self._drag_active = True
-                self._drag_offset = event.globalPos() - self.frameGeometry().topLeft()
+                self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
                 return True
             if event.type() == QEvent.MouseMove and self._drag_active:
-                self.move(event.globalPos() - self._drag_offset)
+                self.move(event.globalPosition().toPoint() - self._drag_offset)
                 return True
             if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
                 self._drag_active = False
@@ -613,6 +978,15 @@ class MainWindow(QMainWindow):
             project_id: 项目ID
         """
         self.current_project_id = project_id
+        # [opencode-console] 让独立 TUI 控制台跟随当前项目会话（内核运行且控制台打开时）
+        try:
+            _boot = getattr(self, "opencode_boot", None)
+            if _boot is not None and _boot.is_running():
+                import threading as _th
+                _th.Thread(target=lambda: _boot.follow_project(project_id),
+                           daemon=True).start()
+        except Exception:
+            pass
         
         # 获取项目信息并更新显示
         try:
@@ -633,6 +1007,7 @@ class MainWindow(QMainWindow):
         
         self.project_switched.emit(project_id)
         self.logger.info(f"切换到项目: {project_id}")
+        self._push_opencode_status()
     
     def on_function_selected(self, function_name: str):
         """
@@ -1135,6 +1510,158 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.feedback_optimization_widget)
         self.status_bar.showMessage('迭代优化仪表盘')
 
+    # ==================== opencode 智能体接入 ====================
+
+    def attach_opencode(self, ui_bridge, boot):
+        """挂载 opencode 智能体：底部栏 + 菜单入口 + 信号接线（全部主线程安全）。"""
+        self.opencode_bridge = ui_bridge
+        self.opencode_boot = boot
+        self.opencode_panel = None
+
+        try:
+            from ui.widgets.opencode_panel import OpenCodePanel
+            self.opencode_panel = OpenCodePanel(boot, self)
+            lay = self.centralWidget().layout() if self.centralWidget() else None
+            if lay is not None:
+                lay.addWidget(self.opencode_panel)
+        except Exception as e:
+            self.logger.error(f"挂载 opencode 面板失败: {e}")
+
+        # 桥 -> 主线程槽
+        try:
+            if self.opencode_panel is not None:
+                ui_bridge.logRequested.connect(self.opencode_panel.append)
+            ui_bridge.toastRequested.connect(self._on_opencode_toast)
+            ui_bridge.navigateRequested.connect(self._on_opencode_navigate)
+            ui_bridge.statusRequested.connect(self._push_opencode_status)
+            ui_bridge.askRequested.connect(self._on_opencode_ask)
+        except Exception as e:
+            self.logger.error(f"opencode 信号接线失败: {e}")
+
+        # 破坏性操作确认门（默认拒绝；此处接到真实 GUI 弹窗）
+        try:
+            from src.kernel.tools import _common as kernel_common
+            kernel_common.set_confirm_hook(self._opencode_confirm)
+        except Exception as e:
+            self.logger.error(f"opencode 确认门接线失败: {e}")
+
+        # 菜单入口
+        try:
+            menu = self.menuBar().addMenu('智能体(&O)')
+            act = QAction('打开/收起 智能体面板', self)
+            act.triggered.connect(lambda: self.opencode_panel and self.opencode_panel.toggle())
+            apply_icon(act, "robot")
+            menu.addAction(act)
+            act_start = QAction('启动内核', self)
+            act_start.triggered.connect(lambda: self.opencode_panel and self.opencode_panel.start_kernel())
+            apply_icon(act_start, "play")
+            menu.addAction(act_start)
+            act_stop = QAction('停止内核', self)
+            act_stop.triggered.connect(lambda: self.opencode_panel and self.opencode_panel.stop_kernel())
+            apply_icon(act_stop, "stop")
+            menu.addAction(act_stop)
+            menu.addSeparator()
+            act_status = QAction('刷新状态', self)
+            act_status.triggered.connect(self._push_opencode_status)
+            apply_icon(act_status, "refresh")
+            menu.addAction(act_status)
+        except Exception as e:
+            self.logger.error(f"opencode 菜单创建失败: {e}")
+
+        self._push_opencode_status()
+
+    def _on_opencode_toast(self, message: str):
+        try:
+            self.status_bar.showMessage(str(message), 8000)
+        except Exception:
+            pass
+        if getattr(self, "opencode_panel", None) is not None:
+            self.opencode_panel.append(f"[toast] {message}")
+
+    def _on_opencode_navigate(self, step: int, project_id: str):
+        try:
+            if project_id and project_id != self.current_project_id:
+                self.on_project_switched(project_id)
+            routes = {
+                1: self.show_project_management,
+                2: self.show_data_cleaning,
+                3: self.show_ai_summary,
+                4: self.show_text_preview,
+                5: self.show_feedback_optimization,
+            }
+            fn = routes.get(int(step))
+            if fn:
+                fn()
+        except Exception as e:
+            self.logger.error(f"opencode 导航失败: {e}")
+
+    def _on_opencode_ask(self, request_id: str, prompt: str, options):
+        """内核 question / 破坏性确认：在主线程弹模态，然后把选择回灌（阻塞解绑）。"""
+        bridge = getattr(self, "opencode_bridge", None)
+        if bridge is None:
+            return
+        labels = [str(x) for x in (options or []) if str(x).strip()]
+        if not labels:
+            labels = ["继续", "取消"]
+        chosen = [labels[-1]]
+        try:
+            box = QMessageBox(self)
+            box.setWindowTitle("OPENCODE 智能体需要确认")
+            box.setIcon(QMessageBox.Question)
+            box.setText(str(prompt))
+            buttons = {}
+            for i, lab in enumerate(labels[:4]):
+                role = QMessageBox.AcceptRole if i == 0 else QMessageBox.RejectRole
+                buttons[box.addButton(lab, role)] = lab
+            box.setDefaultButton(list(buttons.keys())[0])
+            box.exec_()
+            clicked = box.clickedButton()
+            if clicked is not None and clicked in buttons:
+                chosen = [buttons[clicked]]
+        except Exception as e:
+            self.logger.error(f"opencode 确认弹窗失败: {e}")
+        finally:
+            try:
+                bridge.provide_answer(request_id, chosen)
+            except Exception:
+                pass
+
+    def _opencode_confirm(self, action: str, detail) -> bool:
+        """MCP 工具线程调用（阻塞）；经 UIBridge 弹到主线程等用户选择。"""
+        bridge = getattr(self, "opencode_bridge", None)
+        if bridge is None:
+            return False
+        try:
+            labels = bridge.ask(
+                f"智能体请求执行破坏性操作：{action}\n\n{detail}",
+                options=["允许", "拒绝"],
+                timeout=180,
+            )
+        except Exception:
+            return False
+        return bool(labels) and str(labels[0]) == "允许"
+
+    def _push_opencode_status(self):
+        bridge = getattr(self, "opencode_bridge", None)
+        if bridge is None:
+            return
+        try:
+            kernel = {}
+            boot = getattr(self, "opencode_boot", None)
+            if boot is not None:
+                kernel = (boot.status() or {}).get("kernel", {}) or {}
+            bridge.set_status_snapshot({
+                "current_project_id": self.current_project_id,
+                "app_version": self.config.get("app.version"),
+                "driver": os.environ.get("MIMW_DRIVER", "host"),
+                "kernel": kernel,
+            })
+            if getattr(self, "opencode_panel", None) is not None:
+                name = (self.project_info_label.text() or "").replace("当前项目: ", "")
+                self.opencode_panel.set_project(self.current_project_id or "", name)
+        except Exception:
+            pass
+
     def on_data_cleaning_project_selected(self, project_id: str, project_name: str):
         self.current_project_id = project_id
         if project_name:
@@ -1148,6 +1675,14 @@ class MainWindow(QMainWindow):
         Args:
             event: 关闭事件
         """
+        # opencode 内核清理（先停内核再退出）
+        try:
+            boot = getattr(self, "opencode_boot", None)
+            if boot is not None:
+                boot.stop()
+        except Exception:
+            pass
+
         # 保存窗口位置和大小
         self.config.set('ui.window_size.width', self.width())
         self.config.set('ui.window_size.height', self.height())

@@ -1,11 +1,11 @@
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QFileDialog, QTextEdit, QScrollArea, QGroupBox, QSpinBox,
     QCheckBox, QProgressBar, QListWidget, QSplitter, QComboBox,
     QTableWidget, QTableWidgetItem, QTabWidget, QFrame, QMessageBox
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QUrl
-from PyQt5.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent
+from src.core.qt_compat.QtCore import Qt, QThread, pyqtSignal, QUrl
+from src.core.qt_compat.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent
 import glob
 import os
 import sys
@@ -18,6 +18,7 @@ from src.services.user_service import UserService
 from src.utils.logger import get_logger
 from src.core.user_id_manager import UserIDManager
 from src.core.event_bus import get_event_bus, EventNames
+from src.utils.app_icons import apply_icon
 import time
 import json
 
@@ -264,14 +265,17 @@ class TextProcessingWidget(QWidget):
         button_layout = QHBoxLayout()
         
         self.select_file_btn = QPushButton("选择单个文件")
+        apply_icon(self.select_file_btn, "file", "text", 16)
         self.select_file_btn.clicked.connect(self.select_text_file)
         button_layout.addWidget(self.select_file_btn)
         
         self.select_folder_btn = QPushButton("选择文件夹")
+        apply_icon(self.select_folder_btn, "folder", "text", 16)
         self.select_folder_btn.clicked.connect(self.select_text_folder)
         button_layout.addWidget(self.select_folder_btn)
         
         self.clear_selection_btn = QPushButton("清空选择")
+        apply_icon(self.clear_selection_btn, "close", "text", 16)
         self.clear_selection_btn.clicked.connect(self.clear_file_selection)
         self.clear_selection_btn.setEnabled(False)
         button_layout.addWidget(self.clear_selection_btn)
@@ -352,6 +356,7 @@ class TextProcessingWidget(QWidget):
         
         # 处理按钮
         self.process_btn = QPushButton("开始文本分析")
+        apply_icon(self.process_btn, "play", "text", 16)
         self.process_btn.clicked.connect(self.start_text_processing)
         self.process_btn.setEnabled(False)
         layout.addWidget(self.process_btn)
@@ -370,6 +375,7 @@ class TextProcessingWidget(QWidget):
         
         # 导出按钮
         self.export_btn = QPushButton("导出结果")
+        apply_icon(self.export_btn, "export", "text", 16)
         self.export_btn.clicked.connect(self.export_results)
         self.export_btn.setEnabled(False)
         export_layout.addWidget(self.export_btn)
@@ -386,11 +392,13 @@ class TextProcessingWidget(QWidget):
         history_layout.addWidget(self.session_list)
         
         refresh_btn = QPushButton("刷新列表")
+        apply_icon(refresh_btn, "refresh", "text", 16)
         refresh_btn.clicked.connect(self.refresh_session_list)
         history_layout.addWidget(refresh_btn)
         
         # 清除历史会话按钮
         clear_sessions_btn = QPushButton("清除历史会话")
+        apply_icon(clear_sessions_btn, "trash", "on", 16)
         clear_sessions_btn.clicked.connect(self.clear_all_sessions)
         clear_sessions_btn.setStyleSheet("""
             QPushButton {
@@ -453,11 +461,13 @@ class TextProcessingWidget(QWidget):
         button_layout = QHBoxLayout()
         
         self.copy_content_btn = QPushButton("复制内容")
+        apply_icon(self.copy_content_btn, "copy", "text", 16)
         self.copy_content_btn.clicked.connect(self.copy_content_to_clipboard)
         self.copy_content_btn.setEnabled(False)
         button_layout.addWidget(self.copy_content_btn)
         
         self.save_content_btn = QPushButton("保存内容")
+        apply_icon(self.save_content_btn, "save", "text", 16)
         self.save_content_btn.clicked.connect(self.save_content_to_file)
         self.save_content_btn.setEnabled(False)
         button_layout.addWidget(self.save_content_btn)
@@ -498,6 +508,7 @@ class TextProcessingWidget(QWidget):
         button_layout = QHBoxLayout()
         
         self.copy_keywords_btn = QPushButton("复制关键词")
+        apply_icon(self.copy_keywords_btn, "copy", "text", 16)
         self.copy_keywords_btn.clicked.connect(self.copy_keywords_to_clipboard)
         self.copy_keywords_btn.setEnabled(False)
         button_layout.addWidget(self.copy_keywords_btn)
@@ -857,7 +868,7 @@ class TextProcessingWidget(QWidget):
             
     def _show_error_dialog(self, title, technical_error, user_friendly_error):
         """显示错误对话框"""
-        from PyQt5.QtWidgets import QMessageBox
+        from src.core.qt_compat.QtWidgets import QMessageBox
         
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Critical)
@@ -1015,7 +1026,7 @@ class TextProcessingWidget(QWidget):
     def copy_content_to_clipboard(self):
         """复制内容到剪贴板"""
         try:
-            from PyQt5.QtWidgets import QApplication
+            from src.core.qt_compat.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(self.content_text.toPlainText())
             self.status_label.setText("内容已复制到剪贴板")
@@ -1026,7 +1037,7 @@ class TextProcessingWidget(QWidget):
     def copy_keywords_to_clipboard(self):
         """复制关键词到剪贴板"""
         try:
-            from PyQt5.QtWidgets import QApplication
+            from src.core.qt_compat.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(self.keywords_text.toPlainText())
             self.status_label.setText("关键词已复制到剪贴板")

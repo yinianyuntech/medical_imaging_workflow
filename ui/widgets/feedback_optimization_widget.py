@@ -6,15 +6,17 @@ import urllib.parse
 from pathlib import Path
 from datetime import datetime
 from src.ai.agent_skills.ppt_generator import PPTGenerator
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QScrollArea, QFrame, QComboBox, QTextEdit, QTextBrowser, QDialog, 
-    QTabWidget, QSlider, QSizePolicy, QMessageBox, QCheckBox, QSplitter
+    QTabWidget, QSlider, QSizePolicy, QMessageBox, QCheckBox, QSplitter,
+    QFileDialog
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
+from src.core.qt_compat.QtCore import Qt, pyqtSignal
+from src.core.qt_compat.QtGui import QFont, QColor
 
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon, apply_pixmap, icon_pixmap
 
 class DraftCard(QFrame):
     """
@@ -26,17 +28,67 @@ class DraftCard(QFrame):
     def __init__(self, draft_data, parent=None):
         super().__init__(parent)
         self.draft_data = draft_data
+        self.time_lbl = None
+        self.preview = None
+        self.manual_lbl = None
+        self.model_lbl = None
         self.init_ui()
-        
-    def init_ui(self):
+        self._apply_theme()
+
+    # ---------------------------------------------------- 主题
+    @staticmethod
+    def theme_colors() -> dict:
+        """解析当前主题下的卡片配色。
+
+        原实现把 `"#333333" if is_dark else "#FFFFFF"` 直接写在构造期，
+        主题热切换后不会更新；现在统一由 `_apply_theme()` 套用，
+        `refresh_theme()` 可随时重刷。
+        金属皮肤开启时跟随皮肤调色板（避免灰卡/白卡突兀）。
+        """
+        try:
+            from src.utils.skeuomorphic import SKIN_ENABLED, current_palette
+            if SKIN_ENABLED:
+                p = current_palette()
+                dark = p.name == "dark"
+                return {
+                    "dark": dark,
+                    "card_bg": p.s600 if dark else p.s200,
+                    "card_border": p.edge_soft,
+                    "card_hover_border": p.accent,
+                    "card_hover_bg": p.s500 if dark else p.s300,
+                    "time": p.text_dim,
+                    "preview": p.text_dim,
+                    "manual_bg": "#5B3A00" if dark else "#FFF2CC",
+                    "manual_fg": "#FFD8A8" if dark else "#8A2D00",
+                    "model_bg": p.s500 if dark else p.s400,
+                    "model_fg": p.text,
+                }
+        except Exception:
+            pass
         try:
             from src.utils.theme_manager import ThemeManager
             is_dark = ThemeManager.get_current_theme() == "dark"
         except Exception:
             is_dark = False
+        return {
+            "dark": is_dark,
+            "card_bg": "#333333" if is_dark else "#FFFFFF",
+            "card_border": "#555555" if is_dark else "#ddd",
+            "card_hover_border": "#6A6A6A" if is_dark else "#2E86AB",
+            "card_hover_bg": "#3E3E3E" if is_dark else "#f5f9ff",
+            "time": "#D8B4FE" if is_dark else "#666",
+            "preview": "#E9D5FF" if is_dark else "#444",
+            "manual_bg": "#5B3A00" if is_dark else "#FFF2CC",
+            "manual_fg": "#FFD8A8" if is_dark else "#8A2D00",
+            "model_bg": "#4A4A4A" if is_dark else "#eee",
+            "model_fg": "#F5D0FE" if is_dark else "#222",
+        }
 
-        self.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
-        self.setStyleSheet("""
+    def _apply_theme(self):
+        """套用 / 重刷主题相关样式（幂等）。"""
+        c = self.theme_colors()
+        try:
+            self.setStyleSheet("""
             DraftCard {
                 background-color: %s;
                 border: 1px solid %s;
@@ -47,12 +99,42 @@ class DraftCard(QFrame):
                 border: 1px solid %s;
                 background-color: %s;
             }
-        """ % (
-            "#333333" if is_dark else "#FFFFFF",
-            "#555555" if is_dark else "#ddd",
-            "#6A6A6A" if is_dark else "#2E86AB",
-            "#3E3E3E" if is_dark else "#f5f9ff",
-        ))
+        """ % (c["card_bg"], c["card_border"],
+               c["card_hover_border"], c["card_hover_bg"]))
+        except Exception:
+            pass
+        for w, key, tpl in (
+            (self.time_lbl, "time", "color: %s; font-weight: 500;"),
+            (self.preview, "preview", "color: %s; margin: 5px 0;"),
+        ):
+            if w is None:
+                continue
+            try:
+                w.setStyleSheet(tpl % c[key])
+            except Exception:
+                pass
+        if self.manual_lbl is not None:
+            try:
+                self.manual_lbl.setStyleSheet(
+                    "background: %s; color: %s; padding: 3px 8px; border-radius: 4px;"
+                    " font-weight: 700; margin-top: 4px;"
+                    % (c["manual_bg"], c["manual_fg"]))
+            except Exception:
+                pass
+        if self.model_lbl is not None:
+            try:
+                self.model_lbl.setStyleSheet(
+                    "background: %s; color: %s; padding: 2px 6px; border-radius: 4px;"
+                    " font-weight: 600;" % (c["model_bg"], c["model_fg"]))
+            except Exception:
+                pass
+
+    def refresh_theme(self):
+        """主题热切换协议：MainWindow.apply_theme_live() 会遍历调用。"""
+        self._apply_theme()
+
+    def init_ui(self):
+        self.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
         
         layout = QVBoxLayout(self)
         
@@ -63,39 +145,29 @@ class DraftCard(QFrame):
         header.addWidget(title)
         
         time_str = self.draft_data.get('timestamp', 'Unknown Time')
-        time_lbl = QLabel(time_str)
-        time_lbl.setStyleSheet("color: %s; font-weight: 500;" % ("#D8B4FE" if is_dark else "#666"))
-        header.addWidget(time_lbl)
+        self.time_lbl = QLabel(time_str)
+        header.addWidget(self.time_lbl)
         layout.addLayout(header)
         
         # Summary Preview
         preview_text = self.draft_data.get('abstract_preview', 'No abstract available.')
-        preview = QLabel(preview_text)
-        preview.setWordWrap(True)
-        preview.setStyleSheet("color: %s; margin: 5px 0;" % ("#E9D5FF" if is_dark else "#444"))
-        layout.addWidget(preview)
+        self.preview = QLabel(preview_text)
+        self.preview.setWordWrap(True)
+        layout.addWidget(self.preview)
 
         if self.draft_data.get("requires_manual_completion"):
             reason = (self.draft_data.get("manual_completion_reason") or "").strip()
             txt = "⚠️ 需要人工补充内容"
             if reason:
                 txt = f"{txt}：{reason}"
-            manual_lbl = QLabel(txt)
-            manual_lbl.setStyleSheet(
-                "background: %s; color: %s; padding: 3px 8px; border-radius: 4px; font-weight: 700; margin-top: 4px;"
-                % (("#5B3A00" if is_dark else "#FFF2CC"), ("#FFD8A8" if is_dark else "#8A2D00"))
-            )
-            manual_lbl.setWordWrap(True)
-            layout.addWidget(manual_lbl)
+            self.manual_lbl = QLabel(txt)
+            self.manual_lbl.setWordWrap(True)
+            layout.addWidget(self.manual_lbl)
         
         # Footer: Model & Score
         footer = QHBoxLayout()
-        model_lbl = QLabel(f"🤖 {self.draft_data.get('model', 'Unknown Model')}")
-        model_lbl.setStyleSheet(
-            "background: %s; color: %s; padding: 2px 6px; border-radius: 4px; font-weight: 600;"
-            % (("#4A4A4A" if is_dark else "#eee"), ("#F5D0FE" if is_dark else "#222"))
-        )
-        footer.addWidget(model_lbl)
+        self.model_lbl = QLabel(f"🤖 {self.draft_data.get('model', 'Unknown Model')}")
+        footer.addWidget(self.model_lbl)
         
         footer.addStretch()
         
@@ -114,6 +186,7 @@ class DraftCard(QFrame):
         footer.addWidget(self.score_val_lbl)
         
         btn_view = QPushButton("View Details")
+        apply_icon(btn_view, "eye", "text", 15)
         btn_view.clicked.connect(lambda: self.clicked.emit(self.draft_data))
         footer.addWidget(btn_view)
         
@@ -140,7 +213,8 @@ class FeedbackOptimizationWidget(QWidget):
         self.project_service = ProjectService() # Service for DB persistence
         self.draft_history = [] 
         self.current_project_id = None
-        self.llm_service = OllamaLocalService()
+        from src.kernel.inference_gateway import make_llm_service
+        self.llm_service = make_llm_service(OllamaLocalService)
         
         self.init_ui()
         # Initial load (will be empty until project set)
@@ -148,8 +222,71 @@ class FeedbackOptimizationWidget(QWidget):
     def set_current_project(self, project_id):
         """Set current project and load its drafts"""
         self.current_project_id = project_id
+        try:
+            if hasattr(self.llm_service, "set_project"):
+                self.llm_service.set_project(project_id)
+        except Exception:
+            pass
         self.load_drafts_from_db()
         
+    def on_export_word_clicked(self):
+        """导出 Step4 生成的图文 Word 文档（含批注）。"""
+        try:
+            from src.services.step4_word_service import find_latest_step4_docx, export_docx
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "导出失败", f"Word 服务不可用: {e}")
+            return
+        src_path = find_latest_step4_docx(str(self.current_project_id or ""))
+        if not src_path:
+            QMessageBox.warning(self, "未找到 Word 文档",
+                                "当前项目尚未生成 Step4 的 Word 文档（请先完成第四步预览）。")
+            return
+        dest, _ = QFileDialog.getSaveFileName(self, "导出 Word", src_path,
+                                              "Word 文档 (*.docx)")
+        if not dest:
+            return
+        if not dest.lower().endswith(".docx"):
+            dest += ".docx"
+        try:
+            export_docx(src_path, dest)
+            QMessageBox.information(self, "导出完成", f"已导出（含批注）:\n{dest}")
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "导出失败", f"{type(e).__name__}: {e}")
+
+    def on_batch_export_drafts_clicked(self):
+        """批量导出：一稿一 docx（Step5）。"""
+        try:
+            from src.services.step4_word_service import export_drafts_batch
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "导出失败", f"Word 服务不可用: {e}")
+            return
+        if not self.current_project_id:
+            QMessageBox.warning(self, "缺少项目", "请先选择项目。")
+            return
+        default_dir = ""
+        try:
+            from src.services.project_storage_service import ProjectStorageService
+            from src.services.database_service import DatabaseService
+            svc = ProjectStorageService(DatabaseService())
+            storage = str(svc.get_project_storage_path(str(self.current_project_id)))
+            default_dir = os.path.join(storage, "exports", "step5") if storage else ""
+        except Exception:
+            default_dir = ""
+        target = QFileDialog.getExistingDirectory(self, "选择批量导出目录",
+                                                  default_dir or "")
+        if not target:
+            return
+        try:
+            paths = export_drafts_batch(str(self.current_project_id), dest_dir=target)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "导出失败", f"{type(e).__name__}: {e}")
+            return
+        if not paths:
+            QMessageBox.warning(self, "无稿件", "当前项目没有可导出的草稿（或内容为空）。")
+            return
+        QMessageBox.information(self, "批量导出完成",
+                                f"共导出 {len(paths)} 份 Word（一稿一 docx）:\n{target}")
+
     def load_drafts_from_db(self):
         """Load drafts from database"""
         if not self.current_project_id:
@@ -194,42 +331,28 @@ class FeedbackOptimizationWidget(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        try:
-            from src.utils.theme_manager import ThemeManager
-            is_dark = ThemeManager.get_current_theme() == "dark"
-        except Exception:
-            is_dark = False
         
         # 1. Top Dashboard (Stats)
-        stats_frame = QFrame()
-        stats_frame.setStyleSheet(
-            "background-color: %s; border-radius: 8px;" % ("#3E3E3E" if is_dark else "#f0f0f0")
-        )
-        stats_layout = QHBoxLayout(stats_frame)
+        self.stats_frame = QFrame()
+        self.stats_frame.setObjectName("fbStatsFrame")
+        stats_layout = QHBoxLayout(self.stats_frame)
         
         self.stat_total = QLabel("Total Drafts: 0")
         self.stat_avg_score = QLabel("Avg Score: -")
-        if is_dark:
-            self.stat_total.setStyleSheet("color: #F5D0FE; font-weight: 600;")
-            self.stat_avg_score.setStyleSheet("color: #E9D5FF; font-weight: 600;")
         
-        dashboard_title = QLabel("<b>📊 Optimization Dashboard</b>")
-        if is_dark:
-            dashboard_title.setStyleSheet("color: #F0ABFC;")
-        stats_layout.addWidget(dashboard_title)
+        self.dashboard_title = QLabel("<b>📊 Optimization Dashboard</b>")
+        stats_layout.addWidget(self.dashboard_title)
         stats_layout.addStretch()
         stats_layout.addWidget(self.stat_total)
         stats_layout.addSpacing(20)
         stats_layout.addWidget(self.stat_avg_score)
         
-        layout.addWidget(stats_frame)
+        layout.addWidget(self.stats_frame)
         
         # 2. Filters
         filter_layout = QHBoxLayout()
-        filter_label = QLabel("Filter by:")
-        if is_dark:
-            filter_label.setStyleSheet("color: #E9D5FF; font-weight: 600;")
-        filter_layout.addWidget(filter_label)
+        self.filter_label = QLabel("Filter by:")
+        filter_layout.addWidget(self.filter_label)
         self.combo_sort = QComboBox()
         self.combo_sort.addItems(["Newest First", "Highest Score", "Lowest Score"])
         self.combo_sort.currentIndexChanged.connect(lambda _: self.refresh_list())
@@ -238,6 +361,20 @@ class FeedbackOptimizationWidget(QWidget):
         self.chk_manual_only.stateChanged.connect(lambda _: self.refresh_list())
         filter_layout.addWidget(self.chk_manual_only)
         filter_layout.addStretch()
+        self.btn_export_word = QPushButton("导出 Word")
+        try:
+            apply_icon(self.btn_export_word, "download", "text", 16)
+        except Exception:
+            pass
+        self.btn_export_word.clicked.connect(self.on_export_word_clicked)
+        filter_layout.addWidget(self.btn_export_word)
+        self.btn_export_drafts = QPushButton("批量导出草稿")
+        try:
+            apply_icon(self.btn_export_drafts, "folder", "text", 16)
+        except Exception:
+            pass
+        self.btn_export_drafts.clicked.connect(self.on_batch_export_drafts_clicked)
+        filter_layout.addWidget(self.btn_export_drafts)
         layout.addLayout(filter_layout)
         
         # 3. Card Stream (Scroll Area)
@@ -251,6 +388,73 @@ class FeedbackOptimizationWidget(QWidget):
         
         scroll.setWidget(self.cards_container)
         layout.addWidget(scroll)
+
+        self._apply_theme()
+
+    # ---------------------------------------------------- 主题
+    @staticmethod
+    def theme_colors() -> dict:
+        """当前主题下的仪表盘配色（构造期与热切换共用）。"""
+        try:
+            from src.utils.skeuomorphic import SKIN_ENABLED, current_palette
+            if SKIN_ENABLED:
+                p = current_palette()
+                dark = p.name == "dark"
+                return {
+                    "dark": dark,
+                    "stats_bg": p.s600 if dark else p.s300,
+                    "stat_text": p.text if dark else "",
+                    "stat_text2": p.text_dim if dark else "",
+                    "title": p.chip_text if dark else "",
+                }
+        except Exception:
+            pass
+        try:
+            from src.utils.theme_manager import ThemeManager
+            is_dark = ThemeManager.get_current_theme() == "dark"
+        except Exception:
+            is_dark = False
+        return {
+            "dark": is_dark,
+            "stats_bg": "#3E3E3E" if is_dark else "#f0f0f0",
+            "stat_text": "#F5D0FE" if is_dark else "",
+            "stat_text2": "#E9D5FF" if is_dark else "",
+            "title": "#F0ABFC" if is_dark else "",
+        }
+
+    def _apply_theme(self):
+        """套用 / 重刷仪表盘配色（幂等；浅色下置空 → 交给全局皮肤）。"""
+        c = self.theme_colors()
+        try:
+            self.stats_frame.setStyleSheet(
+                "background-color: %s; border-radius: 8px;" % c["stats_bg"])
+        except Exception:
+            pass
+        for w, key in ((self.stat_total, "stat_text"),
+                       (self.stat_avg_score, "stat_text2")):
+            try:
+                w.setStyleSheet(("color: %s; font-weight: 600;" % c[key]) if c[key] else "")
+            except Exception:
+                pass
+        try:
+            self.dashboard_title.setStyleSheet(
+                ("color: %s;" % c["title"]) if c["title"] else "")
+        except Exception:
+            pass
+        try:
+            self.filter_label.setStyleSheet(
+                ("color: %s; font-weight: 600;" % c["stat_text2"]) if c["stat_text2"] else "")
+        except Exception:
+            pass
+
+    def refresh_theme(self):
+        """主题热切换协议：重刷仪表盘 + 全部卡片。"""
+        self._apply_theme()
+        try:
+            for card in self.cards_container.findChildren(DraftCard):
+                card.refresh_theme()
+        except Exception:
+            pass
 
     def load_mock_data(self):
         """Load some mock drafts for testing UI"""
@@ -380,6 +584,48 @@ class FeedbackOptimizationWidget(QWidget):
             card.clicked.connect(self.show_details_dialog)
             card.score_submitted.connect(self.handle_score_submission)
             self.cards_layout.addWidget(card)
+
+        # 空态占位：无草稿时给图标 + 引导文案，避免整页空白
+        if not drafts:
+            self.cards_layout.addWidget(self._build_empty_state())
+
+    def _build_empty_state(self):
+        """构造「暂无草稿」空态卡片（主题自适应）。"""
+        panel = QFrame()
+        panel.setObjectName("fbEmptyState")
+        lay = QVBoxLayout(panel)
+        lay.setContentsMargins(30, 60, 30, 60)
+        lay.setSpacing(14)
+        lay.setAlignment(Qt.AlignCenter)
+
+        icon = QLabel()
+        icon.setAlignment(Qt.AlignCenter)
+        try:
+            apply_pixmap(icon, "chart", "muted", 64)
+        except Exception:
+            icon.setText("📊")
+        lay.addWidget(icon)
+
+        title = QLabel("暂无优化草稿")
+        title.setAlignment(Qt.AlignCenter)
+        f = title.font()
+        f.setPointSizeF(15.0)
+        f.setBold(True)
+        title.setFont(f)
+        lay.addWidget(title)
+
+        hint = QLabel(
+            "完成「第四步 科学文本预览生成」并确认草稿后，\n"
+            "草稿卡片会出现在这里，可评分、反馈与生成汇报 PPT。"
+        )
+        hint.setAlignment(Qt.AlignCenter)
+        try:
+            from src.utils.skeuomorphic import ui_font, SIZE_DIM
+            hint.setFont(ui_font(SIZE_DIM, 400))
+        except Exception:
+            pass
+        lay.addWidget(hint)
+        return panel
 
     def update_stats(self):
         total = len(self.draft_history)
@@ -573,6 +819,7 @@ class FeedbackOptimizationWidget(QWidget):
         f_input = QTextEdit()
         f_input.setPlaceholderText("E.g., The methods section was too brief...")
         submit_btn = QPushButton("Submit Feedback")
+        apply_icon(submit_btn, "send", "text", 15)
         
         def save_feedback():
             draft_data['qualitative_feedback'] = f_input.toPlainText()
@@ -591,6 +838,7 @@ class FeedbackOptimizationWidget(QWidget):
         ppt_layout.addWidget(QLabel("Automatically convert this draft into a scientific PPTX slide deck."))
         
         ppt_btn = QPushButton("Generate PPT")
+        apply_icon(ppt_btn, "wand", "text", 15)
         ppt_status = QLabel("Ready")
         
         def do_ppt_gen():
@@ -610,7 +858,7 @@ class FeedbackOptimizationWidget(QWidget):
                 ppt_gen = PPTGenerator(self.llm_service, model)
                 
                 # Mock async execution for UI responsiveness (In prod use QThread)
-                from PyQt5.QtWidgets import QApplication
+                from src.core.qt_compat.QtWidgets import QApplication
                 QApplication.processEvents()
                 
                 res = ppt_gen.generate_ppt(text)

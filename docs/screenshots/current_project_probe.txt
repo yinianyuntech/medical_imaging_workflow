@@ -1,0 +1,29 @@
+====================================================================================
+启动后逐秒观察 current_project_id
+====================================================================================
+   t=1s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=2s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=3s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=4s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=5s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=6s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=7s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+   t=8s   MainWindow.current_project_id = 'project_1791774057'    项目管理组件.current_project = 'project_1791774057'
+
+====================================================================================
+结论：菜单导航的前置条件
+====================================================================================
+   current_project_id = 'project_1791774057'
+   已设置 → 菜单导航的前置条件满足
+
+====================================================================================
+直接调用各 show_* ，看是否真的切页（用 timer 关掉可能的警告框）
+====================================================================================
+   show_project_management          页面 0→0  ★ 未切页
+   show_dicom_roi                   页面 0→1  ✓ 已切页
+   show_text_processing             页面 1→2  ✓ 已切页
+   show_ocr_recognition             页面 2→3  ✓ 已切页
+   show_data_cleaning               页面 3→5  ✓ 已切页
+   show_ai_summary                  页面 5→6  ✓ 已切页
+   show_text_preview                页面 6→7  ✓ 已切页
+   show_feedback_optimization       页面 7→8  ✓ 已切页

@@ -16,6 +16,19 @@ def _boottrace(message: str):
 
 _boottrace("boot:start")
 
+# === GUI（pythonw）下 sys.stdout/stderr 为 None：uvicorn 等库会因此崩溃，先兜底 ===
+# 实测：MCP 内嵌服务(uvicorn)初始化日志时 sys.stdout.isatty() → AttributeError:
+# 'NoneType' object has no attribute 'isatty' → MCP 永远起不来（内核启动 30s 超时）。
+try:
+    if sys.stdout is None or sys.stderr is None:
+        _devnull = open(os.devnull, "w", encoding="utf-8")
+        if sys.stdout is None:
+            sys.stdout = _devnull
+        if sys.stderr is None:
+            sys.stderr = _devnull
+except Exception:
+    pass
+
 def _disable_fastapi_runtime():
     """
     硬禁用 FastAPI 通道：
@@ -502,8 +515,8 @@ def _start_deepseek_preload_thread(db_service=None):
 try:
     import traceback
     logger.info("Importing PyQt5...")
-    from PyQt5.QtWidgets import QApplication, QMessageBox
-    from PyQt5.QtCore import Qt, QTimer
+    from src.core.qt_compat.QtWidgets import QApplication, QMessageBox
+    from src.core.qt_compat.QtCore import Qt, QTimer
     import qdarkstyle
     logger.info("PyQt5 imported.")
 except Exception as e:
@@ -683,7 +696,7 @@ def main():
     _boottrace("boot:qapplication_created")
     app.setStyle('Fusion')
     try:
-        from PyQt5.QtGui import QIcon
+        from src.core.qt_compat.QtGui import QIcon
 
         icon_candidates = []
         if getattr(sys, "frozen", False):
@@ -724,6 +737,22 @@ def main():
     # Retrieve saved theme (default to light)
     saved_theme = config.get("theme", "light")
     ThemeManager.apply_theme(app, saved_theme)
+
+    # === 光影拟物化皮肤（金属/玻璃）——必须是最后一道全局样式 ===
+    try:
+        from src.utils.skeuomorphic import apply_global as apply_skin
+        if apply_skin(app):
+            _boottrace("boot:skin_applied")
+    except Exception as _skin_err:
+        logging.getLogger(__name__).warning(f"光影皮肤应用失败: {_skin_err}")
+
+    # === 三维拟物绘制引擎（QProxyStyle）——接管按钮/输入框/分组框的立体绘制 ===
+    try:
+        from src.utils.skeuo_style import install as install_skeuo_style
+        if install_skeuo_style(app):
+            _boottrace("boot:skeuo_style_installed")
+    except Exception as _style_err:
+        logging.getLogger(__name__).warning(f"三维绘制引擎安装失败: {_style_err}")
     
     # === License Verification ===
     # 开源发行版默认开放运行（不强制激活）；如需商业授权校验，
@@ -774,6 +803,35 @@ def main():
     window.show()
     _boottrace("boot:mainwindow_shown")
 
+    # === opencode 智能体接入（面板始终挂载；内核默认手动启动）===
+    try:
+        from src.kernel.kernel_boot import KernelBoot
+        from src.kernel.mcp_server import set_ui_bridge
+        from src.kernel.tools.ui_bridge import UIBridge
+
+        _ui_bridge = UIBridge()
+        set_ui_bridge(_ui_bridge)
+        _opencode_boot = KernelBoot(autostart_tui=True)  # 内核启动时弹出独立 TUI 控制台
+        window.attach_opencode(_ui_bridge, _opencode_boot)
+        # 推理网关：与面板共享同一个 KernelBoot → 全部推理服务走同一（项目）会话
+        try:
+            from src.kernel.inference_gateway import bind_boot as _bind_infer_boot
+            _bind_infer_boot(_opencode_boot)
+            _boottrace("boot:inference_gateway_bound")
+        except Exception as _ig_err:
+            logging.getLogger(__name__).warning(f"推理网关绑定失败: {_ig_err}")
+        _boottrace("boot:opencode_attached")
+        # 默认：随程序启动内嵌 opencode 内核 + 独立 TUI 控制台（MIMW_KERNEL_AUTOSTART=0 可关闭）
+        if str(os.environ.get("MIMW_KERNEL_AUTOSTART", "1")).strip() != "0":
+            try:
+                logging.getLogger(__name__).info("opencode kernel autostart triggered")
+                window.opencode_panel.start_kernel()
+                _boottrace("boot:opencode_kernel_autostart")
+            except Exception as _oc_start_err:
+                logging.getLogger(__name__).warning(f"opencode 内核自启动失败: {_oc_start_err}")
+    except Exception as _oc_err:
+        logging.getLogger(__name__).warning(f"opencode 智能体接入失败: {_oc_err}")
+
     # === 首次运行初始化面板（模型权重下载 / API Key 配置）===
     try:
         from src.services.setup_service import SetupService
@@ -809,5 +867,5 @@ if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
     
-    from PyQt5.QtCore import Qt 
+    from src.core.qt_compat.QtCore import Qt 
     main()

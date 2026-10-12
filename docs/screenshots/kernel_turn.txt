@@ -1,0 +1,31 @@
+========================================================================================
+真实对话回合验证
+========================================================================================
+   auth.json providers: ['deepseek']
+     deepseek: type=api  key=len(35)
+   目标模型: deepseek/deepseek-flash
+   提示词  : 请只回答两个字：收到
+
+── KernelBoot.start() 4.45s ──
+   ok=True  kernel.running=True  version=1.18.35
+   api={'health': True, 'session_list': True, 'question': True, 'permission': True}
+   mcp_url=http://127.0.0.1:55584/mcp
+   auth={'success': True, 'provider': 'deepseek', 'source': 'host:custom_api_profiles.json'}
+
+── 1) MCP 是否已连接（模型调用宿主工具的前提） ──
+   通过 boot 校验: None
+
+── 2) 建会话 ──
+   session=ses_ecfab159dffeiqSFImOyRVJoTz
+
+── 3) 投递一轮（legacy V1 阻塞式 prompt） ──
+   这是本 playbook §13 未完成的那一步。
+   耗时 4.16s
+   info.finish=stop  parts=3
+   > 收到
+   工具调用 parts: 0
+
+   判定: FULL_TURN_OK —— 模型已回话，全链路打通 ✅
+
+── 4) 收尾 ──
+   内核已关闭，残留=0

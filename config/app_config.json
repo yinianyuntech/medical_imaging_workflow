@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "医疗数据科学结构化工作流系统 Medical Imaging Workflow",
-    "version": "1.0.0",
+    "name": "医疗数据科学结构化工作流系统（Designed by Christ.paul90@gmail.com. All rights reserved.）",
+    "version": "2.0.0",
     "author": "Medical Imaging Team (hg3992260)",
     "description": "面向医学科研的 DICOM 影像处理 / 数据清洗 / 大模型总结 / 科学文本生成一体化工作流"
   },
@@ -17,11 +17,11 @@
     "language": "zh_CN",
     "window_size": {
       "width": 1920,
-      "height": 1227
+      "height": 1080
     },
     "window_position": {
-      "x": -1,
-      "y": -6
+      "x": 320,
+      "y": 313
     },
     "font": {
       "family": "Microsoft YaHei",
@@ -78,5 +78,9 @@
     "max_login_attempts": 3,
     "lockout_duration": 300
   },
-  "theme": "light"
+  "theme": "dark",
+  "setup": {
+    "completed": true,
+    "completed_at": 1791813818
+  }
 }

@@ -2,9 +2,9 @@ import os
 import sys
 import re
 import qdarkstyle
-from PyQt5.QtWidgets import QApplication, QWidget
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtCore import Qt
+from src.core.qt_compat.QtWidgets import QApplication, QWidget
+from src.core.qt_compat.QtGui import QPalette, QColor
+from src.core.qt_compat.QtCore import Qt
 
 class ThemeManager:
     _current_theme = "dark"  # default
@@ -146,7 +146,7 @@ class ThemeManager:
                 QTableView, QTreeView { background-color: #1E1E1E !important; alternate-background-color: #252526 !important; gridline-color: #555555 !important; }
                 QHeaderView::section { background-color: #333337 !important; color: #E879F9 !important; border: 1px solid #555555 !important; }
             """
-            app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api="pyqt5") + dark_override_qss)
+            app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api="pyqt6") + dark_override_qss)
             
             palette = QPalette()
             palette.setColor(QPalette.Window, QColor("#2B2B2B"))

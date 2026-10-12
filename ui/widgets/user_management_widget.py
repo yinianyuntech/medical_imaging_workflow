@@ -8,14 +8,14 @@
 
 import sys
 import os
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QLineEdit, QFrame,
     QMessageBox, QGroupBox, QSizePolicy, QListWidget,
     QListWidgetItem, QInputDialog, QSplitter, QScrollArea
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from PyQt5.QtGui import QIcon, QFont, QPalette, QPixmap
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QSize
+from src.core.qt_compat.QtGui import QIcon, QFont, QPalette, QPixmap
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -379,7 +379,7 @@ class UserManagementWidget(QWidget):
         user_id_layout.addWidget(list_label)
         
         # 创建滚动区域来容纳自定义样本项
-        from PyQt5.QtWidgets import QScrollArea, QFrame
+        from src.core.qt_compat.QtWidgets import QScrollArea, QFrame
         
         self.scroll_area = QScrollArea()
         self.scroll_area.setMaximumHeight(300)

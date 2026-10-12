@@ -63,3 +63,10 @@ Thumbs.db
 # ---- 会话辅助产物 ----
 session-dashboard.html
 HANDOVER.md
+# opencode embedding (runtime kernel state / bundled kernel binary)
+opencode/
+kernel_home/
+**/kernel_assets/_generated/
+
+# ---- LoopX 本地状态 ----
+.loopx/

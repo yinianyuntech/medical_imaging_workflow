@@ -13,7 +13,7 @@ import html
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QLineEdit, QFrame,
     QMessageBox, QGroupBox, QSizePolicy, QListWidget,
@@ -23,8 +23,8 @@ from PyQt5.QtWidgets import (
     QTextBrowser,
     QProgressBar
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QTimer, QThread, pyqtSlot
-from PyQt5.QtGui import QIcon, QFont, QPalette, QPixmap
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QSize, QTimer, QThread, pyqtSlot
+from src.core.qt_compat.QtGui import QIcon, QFont, QPalette, QPixmap
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -38,8 +38,10 @@ from src.core.event_bus import get_event_bus, EventNames
 from src.core.ui_scale_profile import splitter_sizes
 from src.utils.logger import get_logger
 from src.services.ollama_local_service import OllamaLocalService, CustomLLMService
+from src.kernel.inference_gateway import OpenCodeLLMService, infer_backend
 from src.services.llm_guided_sklearn_pipeline import run_llm_guided_sklearn_pipeline
 from ui.widgets.ai_summary_widget import CustomAPIDialog
+from src.utils.app_icons import apply_icon
 
 
 class Step2MiningWorker(QThread):
@@ -151,6 +153,7 @@ class ProjectListWidget(QWidget):
         
         # 刷新按钮
         refresh_button = QPushButton("刷新项目列表")
+        apply_icon(refresh_button, "refresh", "text", 16)
         refresh_button.setStyleSheet("""
             QPushButton {
                 background-color: #2E86AB;
@@ -546,6 +549,8 @@ class DataCleaningWidget(QWidget):
         self.data_cleaning_service = DataCleaningService(self.db_service)
         self.storage_service = ProjectStorageService(self.db_service)
         self.ollama = OllamaLocalService()
+        # 内嵌 opencode 推理（默认后端）：与智能体面板共享项目会话 → 上下文共享
+        self._opencode_llm = OpenCodeLLMService()
         self._custom_llm_service: Optional[CustomLLMService] = None
         self._custom_api_profiles: List[dict] = []
         self._latest_mining_result: Dict[str, Any] = {}
@@ -614,12 +619,15 @@ class DataCleaningWidget(QWidget):
         self.llm_combo.setMinimumWidth(240)
         ctrl.addWidget(self.llm_combo)
         self.custom_api_btn = QPushButton("+ Custom API")
+        apply_icon(self.custom_api_btn, "plug", "text", 15)
         self.custom_api_btn.clicked.connect(self._on_custom_api_clicked)
         ctrl.addWidget(self.custom_api_btn)
         self.mine_btn = QPushButton("AI数据挖掘与绘图")
+        apply_icon(self.mine_btn, "sparkles", "text", 15)
         self.mine_btn.clicked.connect(self.on_mine_data_clicked)
         ctrl.addWidget(self.mine_btn)
         self.open_export_btn = QPushButton("打开导出目录")
+        apply_icon(self.open_export_btn, "folder-open", "text", 15)
         self.open_export_btn.setEnabled(False)
         self.open_export_btn.clicked.connect(self.open_latest_export_dir)
         ctrl.addWidget(self.open_export_btn)
@@ -699,9 +707,15 @@ class DataCleaningWidget(QWidget):
         except Exception as e:
             self.logger.error(f"保存 Custom API 配置失败: {e}")
 
+    OPENCODE_ITEM = "OpenCode:内嵌（共享上下文）"
+
+    def _opencode_selected(self) -> bool:
+        current = self.llm_combo.currentText() if hasattr(self, "llm_combo") else ""
+        return current.startswith("OpenCode:")
+
     def _refresh_llm_combo(self):
         current = self.llm_combo.currentText() if hasattr(self, "llm_combo") else ""
-        items: List[str] = []
+        items: List[str] = [self.OPENCODE_ITEM]
         try:
             local_models = self.ollama.list_models() or []
             for m in local_models:
@@ -714,14 +728,16 @@ class DataCleaningWidget(QWidget):
             name = str(p.get("name") or "Custom").strip()
             if name:
                 items.append(f"Custom:{name}")
-        if not items:
-            items = ["Custom:DeepSeek"]
+        if len(items) == 1:
+            items.append("Custom:DeepSeek")
         self.llm_combo.clear()
         self.llm_combo.addItems(items)
-        if current:
-            idx = self.llm_combo.findText(current)
-            if idx >= 0:
-                self.llm_combo.setCurrentIndex(idx)
+        # 默认=内嵌 opencode（MIMW_INFER_BACKEND=legacy 时保持旧默认）
+        want = current if current else (
+            self.OPENCODE_ITEM if infer_backend() != "legacy" else "")
+        idx = self.llm_combo.findText(want) if want else -1
+        if idx >= 0:
+            self.llm_combo.setCurrentIndex(idx)
 
     def _on_custom_api_clicked(self):
         dialog = CustomAPIDialog(self)
@@ -747,6 +763,8 @@ class DataCleaningWidget(QWidget):
         return next((p for p in self._custom_api_profiles if str(p.get("name") or "").strip() == name), None)
 
     def _current_model_name(self) -> str:
+        if self._opencode_selected():
+            return ""  # 内嵌 opencode：用内核配置模型（默认 deepseek/deepseek-flash）
         prof = self._selected_custom_profile()
         if prof:
             return str(prof.get("model") or "deepseek-v4-flash")
@@ -756,12 +774,16 @@ class DataCleaningWidget(QWidget):
         return "llama3"
 
     def _current_service_label(self) -> str:
+        if self._opencode_selected():
+            return "内嵌 opencode（共享上下文）"
         prof = self._selected_custom_profile()
         if prof:
             return f"Custom API: {prof.get('name', 'Custom')}"
         return "Ollama"
 
     def _active_llm_service(self) -> Any:
+        if self._opencode_selected():
+            return self._opencode_llm
         prof = self._selected_custom_profile()
         if prof:
             self._custom_llm_service = CustomLLMService(
@@ -874,7 +896,7 @@ class DataCleaningWidget(QWidget):
 
         self.mine_btn.setEnabled(False)
         self.open_export_btn.setEnabled(False)
-        self.mining_status_label.setText(f"状态: 正在分析 ({self._current_service_label()} / {model})")
+        self.self.mining_status_label.setText(f"状态: 正在分析 ({self._current_service_label()}{(' / ' + model) if model else ''})")
         self.mining_result_browser.setPlainText("正在进行 Step2 数据挖掘与绘图，请稍候...")
         self.result_tabs.setCurrentWidget(self.mining_result_browser)
 
@@ -1246,6 +1268,11 @@ OCR会话: {project['stats'].get('ocr_sessions', 0)}
             project_id: 项目ID
         """
         self.selected_project_id = project_id
+        try:
+            if hasattr(self._opencode_llm, "set_project"):
+                self._opencode_llm.set_project(project_id)
+        except Exception:
+            pass
         self.load_projects()
         
         # 自动选中当前项目
@@ -1437,7 +1464,9 @@ class SummaryPaginationDialog(QDialog):
         self.page_size_combo.addItems(["10", "25", "50", "100"])
         self.page_size_combo.setCurrentText("25")
         self.prev_btn = QPushButton("上一页")
+        apply_icon(self.prev_btn, "chevron-left", "text", 15)
         self.next_btn = QPushButton("下一页")
+        apply_icon(self.next_btn, "chevron-right", "text", 15)
         self.page_label = QLabel("第 1 页")
         ctrl.addWidget(QLabel("数据类型"))
         ctrl.addWidget(self.type_combo)

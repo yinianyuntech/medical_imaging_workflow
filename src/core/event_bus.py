@@ -9,7 +9,7 @@
 """
 
 from typing import Dict, List, Callable, Any, Optional
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
+from src.core.qt_compat.QtCore import QObject, pyqtSignal, QTimer
 from datetime import datetime
 import weakref
 import threading
@@ -26,20 +26,11 @@ class EventBus(QObject):
     
     # 全局事件信号
     event_published = pyqtSignal(str, object)  # 事件名称, 事件数据
-    
-    _instance = None
-    _lock = threading.Lock()
-    
-    def __new__(cls):
-        """
-        单例模式实现
-        """
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-        return cls._instance
-    
+
+    # 注意：这里**不使用 __new__ 单例**。
+    # PyQt6/sip 下对 QObject 子类覆写 __new__ 并调用 super().__new__() 会造成
+    # sip 重入 → 栈溢出（0xC00000FD）。单例由模块级 get_event_bus() 负责缓存。
+
     def __init__(self):
         """
         初始化事件总线
@@ -269,8 +260,11 @@ _global_event_bus = None
 
 def get_event_bus() -> EventBus:
     """
-    获取全局事件总线实例
-    
+    获取全局事件总线实例（进程内单例）。
+
+    单例语义由本函数缓存保证；EventBus 自身不再覆写 __new__
+    （PyQt6/sip 不支持 QObject 子类自定义 __new__）。
+
     Returns:
         事件总线实例
     """

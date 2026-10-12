@@ -196,7 +196,93 @@ class OCRService:
 
     # DeepSeek-OCR 是唯一支持的引擎，无需检查其他引擎
 
-    def extract_text_from_image(self, image_path: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
+    # ---------------------------------------------------------------- OCR 入口
+    def extract_text_from_image(self, image_path: str,
+                                config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """图 → 文本。**先走原有链路，失败/空产出则用 API 兜底。**
+
+        为什么用「包装」而不是在每个 return 前插兜底：
+        原方法有十几条 return 分支（Ollama / DeepSeek / vLLM / 传统 OCR / 显存不足 …），
+        逐个插既易漏又难维护。包一层之后**全部 17 个调用点自动获得备份能力**，
+        且原有链路**一行未动**（零回归风险）。
+
+        关闭备份：`config["backup_api"] = False`。
+        """
+        res = self._extract_text_from_image_primary(image_path, config)
+        return self._apply_api_backup(image_path, config, res)
+
+    @staticmethod
+    def _ocr_text_of(res) -> str:
+        if not isinstance(res, dict):
+            return str(res or "").strip()
+        return str(res.get("extracted_text") or res.get("text") or "").strip()
+
+    def _apply_api_backup(self, image_path, config, res):
+        """原链路无产出时，用「可配置的 OpenAI 兼容 VL 端点」兜底一次。
+
+        ⚠️ 不静默：API 也失败时，把 provider 的原话（HTTP 状态 + message）
+        写进返回值的 `backup` 里，让上层能说清"到底卡在哪"。
+        """
+        cfg = dict(config or {})
+        base = res if isinstance(res, dict) else {"text": str(res or "")}
+        if cfg.get("backup_api", True) is False:
+            return base
+        if self._ocr_text_of(base):
+            return base                      # 原链路成功 → 不打扰
+
+        try:
+            from src.services.ocr_api_backup import get_backup
+        except Exception as e:  # noqa: BLE001
+            base["backup"] = {"used": False,
+                              "reason": f"备份模块不可用: {type(e).__name__}: {e}"}
+            return base
+
+        backup = get_backup(cfg, logger=self.logger)
+        ok, why = backup.available()
+        if not ok:
+            base["backup"] = {"used": False, "reason": why, **backup.summary()}
+            self.logger.info(f"OCR API 备份不可用：{why}")
+            return base
+
+        try:
+            self._emit_status(cfg.get("status_callback"),
+                              f"本地 OCR 无产出，改用 API 备份（{backup.model}）…")
+        except Exception:
+            pass
+
+        bres = backup.recognize(image_path, config=cfg)
+        info = {
+            "used": True,
+            "model": bres.get("model"),
+            "base_url": bres.get("base_url"),
+            "source": backup.source,
+            "elapsed_s": bres.get("elapsed_s"),
+            "primary_error": str(base.get("error") or base.get("status") or "")[:300],
+            "error": str(bres.get("error") or "")[:600],
+            "success": bool(bres.get("text")),
+        }
+        if bres.get("text"):
+            out = dict(base)
+            out.update({
+                "text": bres["text"],
+                "extracted_text": bres["text"],
+                "engine": "api_vision",
+                "ocr_engine": "api_vision",
+                "status": "ok",
+                "error": "",
+                "confidence": float(base.get("confidence") or 0.0),
+                "backup": info,
+            })
+            self.logger.info(
+                f"OCR 已由 API 备份完成：model={bres.get('model')} "
+                f"用时={bres.get('elapsed_s')}s 字符={len(bres['text'])}")
+            return out
+
+        base["backup"] = info
+        self.logger.warning(f"OCR API 备份同样失败：{info['error'][:200]}")
+        return base
+
+    def _extract_text_from_image_primary(self, image_path: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """从图像提取文本"""
         config = config or {}
         status_callback = config.get("status_callback")

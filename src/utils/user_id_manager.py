@@ -1,7 +1,7 @@
 from typing import List, Optional, Callable
 import json
 import os
-from PyQt5.QtCore import QObject, pyqtSignal
+from src.core.qt_compat.QtCore import QObject, pyqtSignal
 
 class UserIDManager(QObject):
     """用户ID管理器"""

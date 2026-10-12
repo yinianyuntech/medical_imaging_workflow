@@ -12,17 +12,18 @@ import sys
 import time
 import numpy as np
 import cv2
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QFileDialog, QMessageBox, QFrame, QSizePolicy
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QPoint
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QBrush
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QPoint
+from src.core.qt_compat.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QBrush
 
 from src.services.magic_seg_service import MagicSegService
 from src.services.dicom_service import DicomService
 from src.utils.logger import get_logger
 from src.core.event_bus import get_event_bus, EventNames
+from src.utils.app_icons import apply_icon
 
 class InteractiveCanvas(QLabel):
     """Canvas for displaying image and handling clicks"""
@@ -130,17 +131,20 @@ class MagicSegWidget(QWidget):
         toolbar_layout.setContentsMargins(10, 5, 10, 5)
 
         self.btn_open = QPushButton("Open Folder")
+        apply_icon(self.btn_open, "folder-open", "text", 16)
         self.btn_open.clicked.connect(self.open_folder)
         toolbar_layout.addWidget(self.btn_open)
 
         toolbar_layout.addSpacing(20)
 
-        self.btn_prev = QPushButton("< Prev Image")
+        self.btn_prev = QPushButton("Prev Image")
+        apply_icon(self.btn_prev, "chevron-left", "text", 16)
         self.btn_prev.clicked.connect(self.prev_image)
         self.btn_prev.setEnabled(False)
         toolbar_layout.addWidget(self.btn_prev)
 
-        self.btn_next = QPushButton("Next Image >")
+        self.btn_next = QPushButton("Next Image")
+        apply_icon(self.btn_next, "chevron-right", "text", 16)
         self.btn_next.clicked.connect(self.next_image)
         self.btn_next.setEnabled(False)
         toolbar_layout.addWidget(self.btn_next)
@@ -148,12 +152,14 @@ class MagicSegWidget(QWidget):
         toolbar_layout.addSpacing(20)
 
         self.btn_clear = QPushButton("Clear Points")
+        apply_icon(self.btn_clear, "close", "text", 16)
         self.btn_clear.clicked.connect(self.clear_points)
         toolbar_layout.addWidget(self.btn_clear)
 
         toolbar_layout.addSpacing(20)
         
         self.btn_save = QPushButton("Save ROI")
+        apply_icon(self.btn_save, "save", "on", 16)
         self.btn_save.setStyleSheet("background-color: #007acc; color: white; font-weight: bold;")
         self.btn_save.clicked.connect(self.save_roi)
         self.btn_save.setEnabled(False)

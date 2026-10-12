@@ -4,14 +4,17 @@
 # 说明 / Notes
 #   * 本文件只包含“代码依赖”，不含任何模型权重或二进制资源。
 #   * 模型权重请见 README「模型与外部资源」章节，需单独下载。
-#   * 推荐 Python 3.10 / 3.11（PyQt5 + PyTorch 生态最稳定）。
+#   * 推荐 Python 3.10 / 3.11（PyQt6 + PyTorch 生态最稳定）。
 #   * 需要 GPU 加速时，请先按 PyTorch 官网命令安装带 CUDA 的 torch/torchvision，
 #     再执行本文件（可加 --no-deps 或先装 torch 再装其余）。
 #     e.g. pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 # ============================================================================
 
 # --- GUI ---
-PyQt5==5.15.9
+# 框架已迁移到 PyQt6：源码通过 src/core/qt_compat 保持 PyQt5 风格 API，无需改动业务代码。
+PyQt6==6.10.2
+PyQt6-Qt6==6.10.1
+PyQt6-sip==13.11.0
 QDarkStyle==3.2.3
 
 # --- 科学计算 / 数据处理 ---
@@ -70,3 +73,6 @@ easydict>=1.13
 # segment-anything 需从源码安装（不随本仓库分发）：
 #   pip install git+https://github.com/facebookresearch/segment-anything.git
 # segment-anything
+
+# opencode embedding: MCP server (FastMCP)
+mcp>=1.2.0

@@ -1,15 +1,16 @@
 import json
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, 
     QPushButton, QTreeWidget, QTreeWidgetItem, QSplitter,
     QProgressBar, QMessageBox, QWidget
 )
-from PyQt5.QtCore import Qt, pyqtSignal
+from src.core.qt_compat.QtCore import Qt, pyqtSignal
 
 from src.services.project_service import ProjectService
 from src.services.ollama_local_service import OllamaLocalService
 from src.ai.agent_skills.fragment_surgeon import fragment_surgeon_skill
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon
 
 class RefineFragmentDialog(QDialog):
     """
@@ -28,7 +29,18 @@ class RefineFragmentDialog(QDialog):
         self.logger = get_logger(__name__)
         self.project_service = ProjectService()
         from src.services.ollama_local_service import OllamaLocalService
-        self.llm_service = llm_service if llm_service is not None else OllamaLocalService()
+        if llm_service is not None:
+            self.llm_service = llm_service
+        else:
+            # 默认=内嵌 opencode 推理网关（MIMW_INFER_BACKEND=legacy 可回退）
+            from src.kernel.inference_gateway import make_llm_service
+            self.llm_service = make_llm_service(OllamaLocalService)
+        # 反馈注入项目上下文：绑定到构造参数携带的项目
+        try:
+            if hasattr(self.llm_service, "set_project") and str(project_id or "").strip():
+                self.llm_service.set_project(project_id)
+        except Exception:
+            pass
         self.model = str(model or "llama3")
         
         self.refined_text = None
@@ -82,7 +94,8 @@ class RefineFragmentDialog(QDialog):
         
         # --- Action Bar ---
         action_layout = QHBoxLayout()
-        self.btn_refine = QPushButton("✨ Refine with Data")
+        self.btn_refine = QPushButton("Refine with Data")
+        apply_icon(self.btn_refine, "sparkles", "text", 16)
         self.btn_refine.setStyleSheet("background-color: #2E86AB; color: white; padding: 8px; font-weight: bold;")
         self.btn_refine.clicked.connect(self.on_refine_clicked)
         action_layout.addWidget(self.btn_refine)
@@ -102,9 +115,11 @@ class RefineFragmentDialog(QDialog):
         # --- Footer Buttons ---
         btn_layout = QHBoxLayout()
         btn_cancel = QPushButton("Cancel")
+        apply_icon(btn_cancel, "close", "text", 15)
         btn_cancel.clicked.connect(self.reject)
         
-        self.btn_apply = QPushButton("✔ Apply Change")
+        self.btn_apply = QPushButton("Apply Change")
+        apply_icon(self.btn_apply, "check", "on", 15)
         self.btn_apply.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
         self.btn_apply.setEnabled(False)
         self.btn_apply.clicked.connect(self.accept)
@@ -170,7 +185,7 @@ class RefineFragmentDialog(QDialog):
         
         # Execute (Sync for now, should be threaded in prod)
         # Using QTimer to allow UI to update before freezing
-        from PyQt5.QtCore import QTimer
+        from src.core.qt_compat.QtCore import QTimer
         QTimer.singleShot(100, lambda: self._execute_refine(instruction, data_context))
         
     def _execute_refine(self, instruction, data_context):
@@ -199,4 +214,4 @@ class RefineFragmentDialog(QDialog):
             self.progress_bar.setVisible(False)
 
 # Helper for tree iteration if needed
-from PyQt5.QtWidgets import QTreeWidgetItemIterator
+from src.core.qt_compat.QtWidgets import QTreeWidgetItemIterator

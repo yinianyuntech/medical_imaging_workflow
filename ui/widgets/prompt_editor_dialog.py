@@ -6,9 +6,9 @@ with inline prompt editing, hot-reload, and one-click restore.
 import os
 from typing import Any, Callable, Dict, List, Optional
 
-from PyQt5.QtCore import Qt, QRectF, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtCore import Qt, QRectF, pyqtSignal
+from src.core.qt_compat.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen
+from src.core.qt_compat.QtWidgets import (
     QDialog,
     QGraphicsDropShadowEffect,
     QGraphicsItem,
@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (
 )
 
 from src.ai.prompt_registry import PromptRegistry
+from src.utils.app_icons import apply_icon
 
 
 class FlowNodeWidget(QGraphicsObject):
@@ -164,26 +165,30 @@ class PromptEditorDialog(QDialog):
         right_layout.addWidget(self.prompt_editor)
 
         btn_layout = QHBoxLayout()
-        self.save_btn = QPushButton("💾 保存并热更新")
+        self.save_btn = QPushButton("保存并热更新")
+        apply_icon(self.save_btn, "save", "on", 15)
         self.save_btn.clicked.connect(self._on_save)
-        self.save_btn.setStyleSheet("background:#4C72B0;color:white;font-weight:bold;padding:6px 16px;")
+        self.save_btn.setStyleSheet("background:#4C72B0;color:white;font-weight:bold;padding:6px 16px;border-radius:5px;")
         btn_layout.addWidget(self.save_btn)
 
-        self.revert_btn = QPushButton("🔄 还原此提示词")
+        self.revert_btn = QPushButton("还原此提示词")
+        apply_icon(self.revert_btn, "refresh", "text", 15)
         self.revert_btn.clicked.connect(self._on_revert)
         self.revert_btn.setStyleSheet("padding:6px 16px;")
         btn_layout.addWidget(self.revert_btn)
 
-        self.revert_all_btn = QPushButton("🔁 一键还原全部")
+        self.revert_all_btn = QPushButton("一键还原全部")
+        apply_icon(self.revert_all_btn, "refresh", "on", 15)
         self.revert_all_btn.clicked.connect(self._on_revert_all)
-        self.revert_all_btn.setStyleSheet("background:#C44E52;color:white;padding:6px 16px;")
+        self.revert_all_btn.setStyleSheet("background:#C44E52;color:white;padding:6px 16px;border-radius:5px;")
         btn_layout.addWidget(self.revert_all_btn)
 
         self.revert_all_btn.setToolTip("Restore ALL prompts from backup snapshot")
 
-        self.factory_reset_btn = QPushButton("🏭 恢复出厂默认")
+        self.factory_reset_btn = QPushButton("恢复出厂默认")
+        apply_icon(self.factory_reset_btn, "warning", "on", 15)
         self.factory_reset_btn.clicked.connect(self._on_factory_reset)
-        self.factory_reset_btn.setStyleSheet("background:#8B0000;color:white;padding:6px 16px;")
+        self.factory_reset_btn.setStyleSheet("background:#8B0000;color:white;padding:6px 16px;border-radius:5px;")
         self.factory_reset_btn.setToolTip("Hard reset to shipping defaults (ignores backup)")
         btn_layout.addWidget(self.factory_reset_btn)
 
@@ -237,7 +242,7 @@ class PromptEditorDialog(QDialog):
         self.scene.setSceneRect(0, 0, x0 + cols * col_w + 50, y0 + ((len(stages) - 1) // cols + 1) * row_h + 50)
 
     def _draw_arrow(self, x1: float, y1: float, x2: float, y2: float):
-        from PyQt5.QtCore import QLineF, QPointF
+        from src.core.qt_compat.QtCore import QLineF, QPointF
         pen = QPen(QColor("#aaa"), 2)
         line = QLineF(x1, y1, x2, y2)
         self.scene.addLine(line, pen)

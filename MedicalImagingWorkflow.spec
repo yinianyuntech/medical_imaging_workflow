@@ -2,7 +2,13 @@
 import os
 from pathlib import Path
 
-PROJECT_ROOT = Path(r"F:\RSNA\medical_imaging_workflow")
+# PROJECT_ROOT：优先环境变量；否则沿用历史硬编码路径（若存在）；再回退到 spec 所在目录。
+_HARDCODED = Path(r"F:\RSNA\medical_imaging_workflow")
+_SPEC_DIR = Path(globals().get("SPECPATH", os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = Path(
+    os.environ.get("MIMW_PROJECT_ROOT")
+    or (_HARDCODED if _HARDCODED.exists() else _SPEC_DIR)
+)
 
 # ── Helper: collect a directory tree including all files ──
 def tree_datas(src_rel: str) -> list:
@@ -27,6 +33,18 @@ hidden = [
     "pydicom", "pydicom.dataset",
     "easydict",
     "mpl_toolkits.mplot3d",
+    # opencode embedding kernel
+    "src.kernel.kernel_paths",
+    "src.kernel.kernel_config",
+    "src.kernel.kernel_client",
+    "src.kernel.kernel_driver",
+    "src.kernel.kernel_boot",
+    "src.kernel.mcp_server",
+    "src.kernel.tools._common",
+    "src.kernel.tools.ui_bridge",
+    "src.kernel.tools.domain_tools",
+    "mcp.server.fastmcp",
+    "mcp.server.mcpserver",
 ]
 
 # ── Exclude unused heavy packages ──
@@ -42,6 +60,16 @@ excludes = [
     "mypy",
     "pythoncom", "pywintypes", "win32com",
 ]
+
+# ── opencode 内嵌：随包 agent/skill 资产 + 可选内核二进制 ──
+# 内核 172MB，可用 MIMW_SKIP_KERNEL=1 排除（轻量包走后装/ runtime 查找）。
+extra_datas = []
+_kernel_assets = PROJECT_ROOT / "src" / "kernel" / "kernel_assets"
+if _kernel_assets.exists():
+    extra_datas.append((str(_kernel_assets), "kernel_assets"))
+_opencode_dir = PROJECT_ROOT / "opencode"
+if _opencode_dir.exists() and os.environ.get("MIMW_SKIP_KERNEL", "0") != "1":
+    extra_datas.append((str(_opencode_dir), "opencode"))
 
 block_cipher = None
 
@@ -63,7 +91,7 @@ a = Analysis(
         tree_datas("segment-anything-main"),
         tree_datas("markitdown-main"),
         tree_datas("resources"),
-    ], []),
+    ], []) + extra_datas,
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},

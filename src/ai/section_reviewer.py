@@ -252,11 +252,11 @@ class SectionReviewer:
         # Detect custom API: if llm_service is a remote service (not local Ollama),
         # the panel model names are local-only and won't work. Use main model instead.
         svc_type = type(self.llm_service).__name__ if self.llm_service else ""
-        if "Custom" in svc_type or "Remote" in svc_type:
+        if "Custom" in svc_type or "Remote" in svc_type or "OpenCode" in svc_type:
             if self.model:
                 panel = [self.model, self.model]
             else:
-                panel = ["deepseek-v4-flash", "deepseek-v4-flash"]
+                panel = ["opencode:default", "opencode:default"]
             self._custom_api_judge = True
         else:
             self._custom_api_judge = False

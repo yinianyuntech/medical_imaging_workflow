@@ -1,8 +1,8 @@
 import json
 import os
 import sys
-from PyQt5.QtCore import QTimer, QThread, pyqtSignal
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtCore import QTimer, QThread, pyqtSignal
+from src.core.qt_compat.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -29,6 +29,7 @@ from src.services.text_service import TextService
 from src.ai.pdf_template_parser import parse_pdf_sections_from_text, summarize_pdf_template
 from src.ai.pdf_template_layout import analyze_pdf_template_layout_hybrid
 from src.ai.section_progression import compute_section_progression
+from src.utils.app_icons import apply_icon
 
 
 class PdfTemplateImportWorker(QThread):
@@ -103,7 +104,8 @@ class TemplateWizardDialog(QDialog):
         self.model = model
         self.project_id = project_id or ""
         self.lancedb_uri = lancedb_uri or ""
-        self.llm_service = OllamaLocalService()
+        from src.kernel.inference_gateway import make_llm_service
+        self.llm_service = make_llm_service(OllamaLocalService)
         self.fitter = TemplateFitter(self.llm_service, model=self.model)
         self.local_manager = LocalTemplateManager()
 
@@ -135,18 +137,22 @@ class TemplateWizardDialog(QDialog):
         row.addWidget(self.query_edit, 3)
 
         self.search_btn = QPushButton("线上搜索")
+        apply_icon(self.search_btn, "search", "text", 15)
         self.search_btn.clicked.connect(self._do_online_search)
         row.addWidget(self.search_btn, 1)
 
         self.refresh_btn = QPushButton("刷新本地")
+        apply_icon(self.refresh_btn, "refresh", "text", 15)
         self.refresh_btn.clicked.connect(self._refresh_combo)
         row.addWidget(self.refresh_btn, 1)
 
         self.import_btn = QPushButton("从磁盘导入...")
+        apply_icon(self.import_btn, "import", "text", 15)
         self.import_btn.clicked.connect(self._import_from_disk)
         row.addWidget(self.import_btn, 1)
 
         self.pdf_btn = QPushButton("导入PDF模板...")
+        apply_icon(self.pdf_btn, "file", "text", 15)
         self.pdf_btn.clicked.connect(self._import_pdf_template)
         row.addWidget(self.pdf_btn, 1)
 
@@ -173,6 +179,7 @@ class TemplateWizardDialog(QDialog):
         self.ocr_status_label.setStyleSheet("font-size:11px; color:#111; font-weight:bold;")
         ocr_row.addWidget(self.ocr_status_label, 5)
         self.ocr_check_btn = QPushButton("OCR 自检")
+        apply_icon(self.ocr_check_btn, "check", "text", 15)
         self.ocr_check_btn.clicked.connect(lambda: self._refresh_ocr_status(show_message=True))
         ocr_row.addWidget(self.ocr_check_btn, 1)
         layout.addLayout(ocr_row)
@@ -194,6 +201,11 @@ class TemplateWizardDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
+        try:
+            apply_icon(buttons.button(QDialogButtonBox.Ok), "check", "text", 15)
+            apply_icon(buttons.button(QDialogButtonBox.Cancel), "close", "text", 15)
+        except Exception:
+            pass
         layout.addWidget(buttons)
 
     def _setup_ocr_status_timer(self):

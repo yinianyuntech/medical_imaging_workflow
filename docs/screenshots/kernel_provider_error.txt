@@ -1,0 +1,21 @@
+========================================================================================
+provider 错误暴露回归测试（用无效 key，无需真实凭据）
+========================================================================================
+   原始 auth.json = ['deepseek']
+   已写入无效 key: sk-INVALID-REGRESSION-0000
+   start ok=True version=1.18.35
+
+── 投递一轮（预期在 provider 处 401） ──
+   耗时 2.73s
+   ok=False  finish=''  parts=0
+   error=Authentication Fails, Your api key: ****0000 is invalid (request_id: 5fb77aa2-7fe7-4dc6-ad45-957c587fd05c)
+   provider_error=Authentication Fails, Your api key: ****0000 is invalid (request_id: 5fb77aa2-7fe7-4dc6-ad45-957c587fd05c)
+   [PASS] run_turn 报 ok=False（未把 401 当成功）: ok=False
+   [PASS] 错误文本非空: len=213
+   [PASS] 能看出是鉴权/provider 问题: authentication fails, your api key: ****0000 is invalid (request_id: 5fb77aa2-7fe7-4dc6-ad45-957c587fd05c) authenticatio
+   [PASS] parts 为空（与本结论一致）: parts=0
+   已恢复原 auth.json (['deepseek'])
+
+========================================================================================
+total=4 passed=4 failed=0
+RESULT: PASS

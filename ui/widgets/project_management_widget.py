@@ -11,15 +11,15 @@ import os
 import uuid
 from pathlib import Path
 from datetime import datetime
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QLineEdit, QFrame,
     QMessageBox, QGroupBox, QSizePolicy, QListWidget,
     QListWidgetItem, QInputDialog, QSplitter, QScrollArea,
     QComboBox, QTextEdit, QDialog, QFileDialog, QProgressDialog, QCheckBox
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QTimer
-from PyQt5.QtGui import QIcon, QFont, QPalette, QPixmap
+from src.core.qt_compat.QtCore import Qt, pyqtSignal, QSize, QTimer
+from src.core.qt_compat.QtGui import QIcon, QFont, QPalette, QPixmap
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -33,6 +33,7 @@ from src.services.dicom_service import DicomService
 from src.models.project import Project
 from src.core.event_bus import get_event_bus, EventNames
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon, apply_pixmap, icon_pixmap
 
 
 class ProjectItemWidget(QWidget):
@@ -261,8 +262,10 @@ class ProjectManagementWidget(QWidget):
             parent_layout: 父布局
         """
         # 项目选择组框
+        # 不用 setFixedHeight：内容（下拉框 + 3 行项目信息）会超出，导致末行被裁切。
+        # 改为最小高度 + 按内容自适应，字体/DPI 变化也不会再裁字。
         selector_group = QGroupBox("当前项目")
-        selector_group.setFixedHeight(120)
+        selector_group.setMinimumHeight(120)
         selector_layout = QVBoxLayout(selector_group)
         selector_layout.setSpacing(15)
         
@@ -329,19 +332,29 @@ class ProjectManagementWidget(QWidget):
         
         # 项目操作按钮
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
         
         self.add_project_button = QPushButton("新建项目")
-        self.add_project_button.setFixedSize(80, 30)
+        self.add_project_button.setFixedHeight(32)
+        self.add_project_button.setMinimumWidth(110)
+        apply_icon(self.add_project_button, "plus", "text", 16)
         
         self.delete_project_button = QPushButton("删除勾选")
-        self.delete_project_button.setFixedSize(80, 30)
+        self.delete_project_button.setFixedHeight(32)
+        self.delete_project_button.setMinimumWidth(110)
         self.delete_project_button.setEnabled(True)
         self.delete_project_button.setToolTip("删除列表中所有已勾选的项目")
+        apply_icon(self.delete_project_button, "trash", "text", 16)
         
         self.refresh_button = QPushButton("刷新")
-        self.refresh_button.setFixedSize(60, 30)
+        self.refresh_button.setFixedHeight(32)
+        self.refresh_button.setMinimumWidth(88)
+        apply_icon(self.refresh_button, "refresh", "text", 16)
+        
         self.add_root_button = QPushButton("添加根目录")
-        self.add_root_button.setFixedSize(95, 30)
+        self.add_root_button.setFixedHeight(32)
+        self.add_root_button.setMinimumWidth(120)
+        apply_icon(self.add_root_button, "folder-plus", "text", 16)
         
         button_layout.addWidget(self.add_project_button)
         button_layout.addWidget(self.delete_project_button)
@@ -357,7 +370,7 @@ class ProjectManagementWidget(QWidget):
         
         # 创建滚动区域来容纳自定义项目项
         self.scroll_area = QScrollArea()
-        self.scroll_area.setMaximumHeight(300)
+        self.scroll_area.setMinimumHeight(200)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -376,14 +389,16 @@ class ProjectManagementWidget(QWidget):
         self.projects_layout.setContentsMargins(5, 5, 5, 5)
         
         self.scroll_area.setWidget(self.projects_container)
-        project_layout.addWidget(self.scroll_area)
+        # 列表占满剩余高度（底部不再留大片空白）
+        project_layout.addWidget(self.scroll_area, 1)
         
         # 统计信息
         self.stats_label = QLabel("总计: 0 个项目")
         self.stats_label.setStyleSheet("color: #666666; font-size: 11px;")
         project_layout.addWidget(self.stats_label)
         
-        parent_layout.addWidget(project_group)
+        # 组框占满左栏高度
+        parent_layout.addWidget(project_group, 1)
     
     def create_function_navigation(self, parent_layout):
         """
@@ -404,6 +419,7 @@ class ProjectManagementWidget(QWidget):
                 'name': '样本管理',
                 'description': '样本数据管理\n项目关联映射\n增删改查操作',
                 'icon': 'sample_icon.png',
+                'icon_name': 'database',
                 'signal': 'sample_management'
             }
         ]
@@ -418,8 +434,12 @@ class ProjectManagementWidget(QWidget):
             col = i % 2
             nav_layout.addWidget(button, row, col)
         
-        # 如果是奇数个按钮，最后一个居中
-        if len(functions) % 2 == 1:
+        # 单个功能卡片：横跨两列居中，避免"靠左半个、右边空一半"的失衡感
+        if len(functions) == 1:
+            nav_layout.setColumnStretch(0, 1)
+            nav_layout.setColumnStretch(1, 1)
+            nav_layout.addWidget(self.function_buttons[0], 0, 0, 1, 2, Qt.AlignHCenter)
+        elif len(functions) % 2 == 1:
             nav_layout.setColumnStretch(0, 1)
             nav_layout.setColumnStretch(1, 1)
         
@@ -427,8 +447,6 @@ class ProjectManagementWidget(QWidget):
         
         # 添加样本信息显示框
         self.create_sample_info_display(parent_layout)
-        
-        parent_layout.addStretch()
     
     def create_function_button(self, func_data):
         """
@@ -441,55 +459,71 @@ class ProjectManagementWidget(QWidget):
             QPushButton: 功能按钮
         """
         button = QPushButton()
-        button.setFixedSize(300, 150)
         button.setEnabled(False)  # 初始状态禁用，选择项目后启用
         
         # 创建按钮内容布局
         button_layout = QVBoxLayout(button)
         button_layout.setSpacing(10)
         
-        # 图标（如果存在）
+        # 图标：优先矢量图标（主题自适应、任意 DPI 清晰）
         icon_label = QLabel()
-        icon_path = f"assets/icons/{func_data['icon']}"
-        if os.path.exists(icon_path):
+        icon_name = func_data.get('icon_name') or 'database'
+        icon_path = f"assets/icons/{func_data.get('icon', '')}"
+        if not func_data.get('icon_name') and func_data.get('icon') and os.path.exists(icon_path):
             pixmap = QPixmap(icon_path)
             icon_label.setPixmap(pixmap.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            icon_label.setText("📊")  # 默认图标
-            icon_label.setStyleSheet("font-size: 48px;")
+            try:
+                apply_pixmap(icon_label, icon_name, "chip", 46)
+            except Exception:
+                icon_label.setText("📊")
+                icon_label.setStyleSheet("font-size: 48px;")
         
         icon_label.setAlignment(Qt.AlignCenter)
         
-        # 功能名称
+        # 功能名称：字体走 QFont（内联样式表会被皮肤清理，字号/字重会丢）
         name_label = QLabel(func_data['name'])
         name_label.setAlignment(Qt.AlignCenter)
-        name_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: #D0D0D0;
-            }
-        """)
+        try:
+            from src.utils.skeuomorphic import ui_font, SIZE_HEAD
+            name_label.setFont(ui_font(SIZE_HEAD + 2, 700))
+        except Exception:
+            f = name_label.font()
+            f.setPointSizeF(15.0)
+            f.setBold(True)
+            name_label.setFont(f)
         
         # 功能描述
         desc_label = QLabel(func_data['description'])
         desc_label.setAlignment(Qt.AlignCenter)
-        desc_label.setStyleSheet("""
-            QLabel {
-                font-size: 12px;
-                color: #F2F2F2;
-                line-height: 1.4;
-                font-weight: 600;
-            }
-        """)
+        try:
+            from src.utils.skeuomorphic import ui_font, SIZE_DIM
+            desc_label.setFont(ui_font(SIZE_DIM, 500))
+        except Exception:
+            pass
         
         button_layout.addWidget(icon_label)
         button_layout.addWidget(name_label)
         button_layout.addWidget(desc_label)
-        
+
+        # ⚠️ 尺寸必须在**加完子控件之后**定，而且要用布局算出来的高度。
+        #    原因：`QPushButton::sizeHint()` 被 Qt 重写成"只按文字算"，
+        #    **完全不考虑内部布局** —— 所以给按钮塞布局后，它不会跟着内容长高。
+        #    原实现写死 `setFixedSize(300, 150)`，而"图标 48 + 名称 + 3 行描述"
+        #    实际需要 ~163px → 描述标签被顶出 8px、最后一行字被按钮边缘切掉。
+        #    实测：布局会尊重**显式最小尺寸**，所以按内容把最小高度提上去即可。
+        need_h = 150
+        try:
+            hint = button_layout.totalSizeHint().height()
+            mn = button_layout.totalMinimumSize().height()
+            need_h = max(150, min(280, int(max(hint, mn)) + 2))
+        except Exception:
+            pass
+        button.setMinimumSize(300, need_h)
+
         # 连接点击事件
         button.clicked.connect(lambda: self.function_selected.emit(func_data['signal']))
-        
+
         return button
     
     def create_sample_info_display(self, parent_layout):
@@ -502,7 +536,7 @@ class ProjectManagementWidget(QWidget):
         # 样本信息组框
         sample_group = QGroupBox("当前项目样本信息")
         sample_group.setObjectName("sampleInfoGroup")
-        sample_group.setFixedHeight(400)  # 增加高度以容纳更多按钮
+        sample_group.setMinimumHeight(380)  # 容纳样本列表 + 操作/导航按钮；高度随窗口伸缩
         sample_layout = QVBoxLayout(sample_group)
         sample_layout.setSpacing(10)
         
@@ -541,7 +575,7 @@ class ProjectManagementWidget(QWidget):
         # 样本列表
         self.sample_list = QListWidget()
         self.sample_list.setObjectName("sampleList")
-        self.sample_list.setMaximumHeight(180)  # 调整高度
+        self.sample_list.setMinimumHeight(120)
         self.sample_list.setStyleSheet("""
             QListWidget {
                 border: 1px solid #707070;
@@ -564,20 +598,23 @@ class ProjectManagementWidget(QWidget):
                 background-color: #4A4A4A;
             }
         """)
-        sample_layout.addWidget(self.sample_list)
+        # 列表占满组内剩余高度
+        sample_layout.addWidget(self.sample_list, 1)
         
         # 样本管理按钮
         management_layout = QHBoxLayout()
+        management_layout.setSpacing(10)
         
         self.add_sample_button = QPushButton("新建样本")
-        self.add_sample_button.setFixedSize(80, 25)
+        self.add_sample_button.setFixedSize(100, 30)
+        apply_icon(self.add_sample_button, "plus", "on", 15)
         self.add_sample_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -590,14 +627,15 @@ class ProjectManagementWidget(QWidget):
         """)
         
         self.delete_sample_button = QPushButton("删除样本")
-        self.delete_sample_button.setFixedSize(80, 25)
+        self.delete_sample_button.setFixedSize(100, 30)
+        apply_icon(self.delete_sample_button, "trash", "on", 15)
         self.delete_sample_button.setStyleSheet("""
             QPushButton {
                 background-color: #F44336;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -610,14 +648,15 @@ class ProjectManagementWidget(QWidget):
         """)
         
         self.refresh_samples_button = QPushButton("刷新")
-        self.refresh_samples_button.setFixedSize(60, 25)
+        self.refresh_samples_button.setFixedSize(88, 30)
+        apply_icon(self.refresh_samples_button, "refresh", "on", 15)
         self.refresh_samples_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF9800;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -638,16 +677,18 @@ class ProjectManagementWidget(QWidget):
         
         # 功能导航按钮（选中样本后显示）
         navigation_layout = QHBoxLayout()
+        navigation_layout.setSpacing(10)
         
         self.dicom_nav_button = QPushButton("DICOM")
-        self.dicom_nav_button.setFixedSize(60, 25)
+        self.dicom_nav_button.setFixedSize(96, 30)
+        apply_icon(self.dicom_nav_button, "image", "on", 15)
         self.dicom_nav_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -660,14 +701,15 @@ class ProjectManagementWidget(QWidget):
         """)
         
         self.text_nav_button = QPushButton("文本")
-        self.text_nav_button.setFixedSize(60, 25)
+        self.text_nav_button.setFixedSize(96, 30)
+        apply_icon(self.text_nav_button, "file-text", "on", 15)
         self.text_nav_button.setStyleSheet("""
             QPushButton {
                 background-color: #2E86AB;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -680,14 +722,15 @@ class ProjectManagementWidget(QWidget):
         """)
         
         self.ocr_nav_button = QPushButton("OCR")
-        self.ocr_nav_button.setFixedSize(60, 25)
+        self.ocr_nav_button.setFixedSize(96, 30)
+        apply_icon(self.ocr_nav_button, "scan-text", "on", 15)
         self.ocr_nav_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF9800;
                 color: white;
                 border: none;
-                border-radius: 3px;
-                font-size: 10px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -707,7 +750,8 @@ class ProjectManagementWidget(QWidget):
         
         sample_layout.addLayout(navigation_layout)
         
-        parent_layout.addWidget(sample_group)
+        # 样本组占满右栏剩余高度（窗口拉大时列表跟着变高）
+        parent_layout.addWidget(sample_group, 1)
         
         # 初始化变量
         self.selected_sample_id = None
@@ -773,6 +817,10 @@ class ProjectManagementWidget(QWidget):
                 self.add_project_item(project)
                 self.project_combo.addItem(project.name, project.project_id)
             
+            # 尾部伸缩：让项目卡片**顶部堆叠**（否则 QVBoxLayout 会把多余高度
+            # 均摊成卡片间的巨缝 —— 实测两个项目被拉开 ~300px）
+            self.projects_layout.addStretch(1)
+            
             # 更新统计信息
             self.stats_label.setText(f"总计: {len(projects)} 个项目")
             
@@ -821,7 +869,7 @@ class ProjectManagementWidget(QWidget):
         item_widget.project_selected.connect(self.on_project_item_selected)
         item_widget.function_requested.connect(self.on_function_requested)
         
-        self.projects_layout.addWidget(item_widget)
+        self.projects_layout.addWidget(item_widget, 0, Qt.AlignTop)
         self.project_items.append(item_widget)
     
     def add_project(self):
@@ -1538,7 +1586,17 @@ class ProjectManagementWidget(QWidget):
     def apply_styles(self):
         """
         应用样式
+
+        光影拟物化皮肤由 `src/utils/skeuomorphic.py` 全局下发；本方法只在皮肤
+        关闭时回退旧浅色样式（避免局部硬编码样式覆盖全局皮肤）。
         """
+        try:
+            from src.utils.skeuomorphic import SKIN_ENABLED
+            if SKIN_ENABLED:
+                return
+        except Exception:
+            pass
+
         self.setStyleSheet("""
             QGroupBox {
                 font-size: 14px;
@@ -1660,11 +1718,13 @@ class ProjectCreateDialog(QDialog):
         button_layout = QHBoxLayout()
         
         self.cancel_button = QPushButton("取消")
-        self.cancel_button.setFixedSize(80, 35)
+        self.cancel_button.setFixedSize(96, 35)
+        apply_icon(self.cancel_button, "close", "text", 16)
         self.cancel_button.clicked.connect(self.reject)
         
         self.create_button = QPushButton("创建")
-        self.create_button.setFixedSize(80, 35)
+        self.create_button.setFixedSize(96, 35)
+        apply_icon(self.create_button, "check", "text", 16)
         self.create_button.clicked.connect(self.accept)
         
         button_layout.addStretch()

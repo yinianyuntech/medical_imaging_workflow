@@ -1,12 +1,12 @@
 
-from PyQt5.QtWidgets import (
+from src.core.qt_compat.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QFileDialog, QTextEdit, QScrollArea, QGroupBox, QSpinBox,
     QCheckBox, QProgressBar, QListWidget, QSplitter, QFrame, QSlider,
     QMessageBox, QDoubleSpinBox, QListWidgetItem
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QUrl, QMimeData
-from PyQt5.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent, QPalette, QImage
+from src.core.qt_compat.QtCore import Qt, QThread, pyqtSignal, QUrl, QMimeData
+from src.core.qt_compat.QtGui import QPixmap, QFont, QDragEnterEvent, QDropEvent, QPalette, QImage
 import os
 import sys
 import glob
@@ -23,6 +23,7 @@ from src.services.user_service import UserService
 from src.core.user_id_manager import UserIDManager
 from src.core.event_bus import get_event_bus, EventNames
 from src.utils.logger import get_logger
+from src.utils.app_icons import apply_icon
 
 class DicomProcessingThread(QThread):
     """DICOM处理线程"""
@@ -574,14 +575,17 @@ class DicomRoiWidget(QWidget):
         
         # 文件选择按钮
         select_file_btn = QPushButton("选择DICOM文件")
+        apply_icon(select_file_btn, "file", "text", 16)
         select_file_btn.clicked.connect(self.select_dicom_file)
         file_layout.addWidget(select_file_btn)
         
         select_folder_btn = QPushButton("选择DICOM文件夹")
+        apply_icon(select_folder_btn, "folder", "text", 16)
         select_folder_btn.clicked.connect(self.select_dicom_folder)
         file_layout.addWidget(select_folder_btn)
         
         self.clear_selection_btn = QPushButton("清空选择")
+        apply_icon(self.clear_selection_btn, "close", "text", 16)
         self.clear_selection_btn.clicked.connect(self.clear_file_selection)
         self.clear_selection_btn.setEnabled(False)
         file_layout.addWidget(self.clear_selection_btn)
@@ -591,9 +595,11 @@ class DicomRoiWidget(QWidget):
         self.overlay_folder_label = QLabel("未选择覆盖层文件夹")
         overlay_folder_layout.addWidget(self.overlay_folder_label)
         select_overlay_folder_btn = QPushButton("选择覆盖层文件夹")
+        apply_icon(select_overlay_folder_btn, "folder", "text", 16)
         select_overlay_folder_btn.clicked.connect(self.select_overlay_folder)
         overlay_folder_layout.addWidget(select_overlay_folder_btn)
         self.process_overlay_folder_btn = QPushButton("处理覆盖层文件夹")
+        apply_icon(self.process_overlay_folder_btn, "layers", "text", 16)
         self.process_overlay_folder_btn.clicked.connect(self.start_overlay_folder_processing)
         self.process_overlay_folder_btn.setEnabled(False)
         overlay_folder_layout.addWidget(self.process_overlay_folder_btn)
@@ -633,6 +639,7 @@ class DicomRoiWidget(QWidget):
         
         # 处理按钮
         self.process_btn = QPushButton("开始处理")
+        apply_icon(self.process_btn, "play", "on", 16)
         self.process_btn.clicked.connect(self.start_roi_processing)
         self.process_btn.setEnabled(False)
         self.process_btn.setStyleSheet("""
@@ -675,10 +682,12 @@ class DicomRoiWidget(QWidget):
         # 会话操作按钮
         session_btn_layout = QHBoxLayout()
         refresh_btn = QPushButton("刷新")
+        apply_icon(refresh_btn, "refresh", "text", 16)
         refresh_btn.clicked.connect(self.refresh_session_list)
         session_btn_layout.addWidget(refresh_btn)
         
         clear_btn = QPushButton("清除历史")
+        apply_icon(clear_btn, "trash", "text", 16)
         clear_btn.clicked.connect(self.clear_all_sessions)
         session_btn_layout.addWidget(clear_btn)
         
@@ -723,6 +732,7 @@ class DicomRoiWidget(QWidget):
         nav_layout = QHBoxLayout()
         
         self.prev_image_btn = QPushButton("上一张")
+        apply_icon(self.prev_image_btn, "chevron-left", "text", 16)
         self.prev_image_btn.clicked.connect(self.show_previous_image)
         self.prev_image_btn.setEnabled(False)
         nav_layout.addWidget(self.prev_image_btn)
@@ -733,6 +743,7 @@ class DicomRoiWidget(QWidget):
         nav_layout.addWidget(self.image_slider)
         
         self.next_image_btn = QPushButton("下一张")
+        apply_icon(self.next_image_btn, "chevron-right", "text", 16)
         self.next_image_btn.clicked.connect(self.show_next_image)
         self.next_image_btn.setEnabled(False)
         nav_layout.addWidget(self.next_image_btn)
@@ -766,11 +777,15 @@ class DicomRoiWidget(QWidget):
         self.overlay_list_widget.currentRowChanged.connect(self.on_overlay_selected)
         overlay_nav_layout = QHBoxLayout()
         self.prev_overlay_btn = QPushButton("上一覆盖层")
+        apply_icon(self.prev_overlay_btn, "chevron-left", "text", 16)
         self.next_overlay_btn = QPushButton("下一覆盖层")
+        apply_icon(self.next_overlay_btn, "chevron-right", "text", 16)
         self.prev_overlay_btn.clicked.connect(self.show_previous_overlay)
         self.next_overlay_btn.clicked.connect(self.show_next_overlay)
+        overlay_nav_layout.addStretch()
         overlay_nav_layout.addWidget(self.prev_overlay_btn)
         overlay_nav_layout.addWidget(self.next_overlay_btn)
+        overlay_nav_layout.addStretch()
         overlay_layout1.addLayout(overlay_nav_layout)
         overlay_group1.setLayout(overlay_layout1)
         overlay_layout.addWidget(overlay_group1)
@@ -795,7 +810,7 @@ class DicomRoiWidget(QWidget):
             entry = entries[index - 1]
             path = entry.get('path','')
             if path and os.path.exists(path):
-                from PyQt5.QtGui import QPixmap
+                from src.core.qt_compat.QtGui import QPixmap
                 pixmap = QPixmap(path)
                 self._set_pixmap_1_to_1(self.overlay_image_label, pixmap)
             text = entry.get('text','')
@@ -869,12 +884,18 @@ class DicomRoiWidget(QWidget):
         action_layout = QHBoxLayout()
         
         save_btn = QPushButton("保存结果")
+        apply_icon(save_btn, "save", "text", 16)
+        save_btn.setMinimumWidth(150)
         save_btn.clicked.connect(self.save_roi_results)
         action_layout.addWidget(save_btn)
         
         export_btn = QPushButton("导出数据")
+        apply_icon(export_btn, "export", "text", 16)
+        export_btn.setMinimumWidth(150)
         export_btn.clicked.connect(self.export_roi_data)
         action_layout.addWidget(export_btn)
+        
+        action_layout.addStretch()
         
         layout.addLayout(action_layout)
         layout.addStretch()
@@ -1160,7 +1181,7 @@ class DicomRoiWidget(QWidget):
             
     def _show_error_dialog(self, title, technical_error, user_friendly_error):
         """显示错误对话框"""
-        from PyQt5.QtWidgets import QMessageBox, QTextEdit
+        from src.core.qt_compat.QtWidgets import QMessageBox, QTextEdit
         
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Critical)
