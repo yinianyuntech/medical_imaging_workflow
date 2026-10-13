@@ -1,5 +1,5 @@
 # ---- 模型权重 / 大资源（不进入仓库）----
-models/
+/models/
 assets/models/
 assets/models_home/
 assets/ollama/
@@ -14,9 +14,9 @@ assets/cache/
 *.gguf
 
 # ---- 打包产物 / 构建中间件 ----
-dist/
+/dist/
 dist_license_manager_onefile/
-build/
+/build/
 __pycache__/
 .pycache_pyinstaller/
 *.spec.bak
@@ -27,17 +27,17 @@ segment-anything-main/
 markitdown-main/
 bioicons-main/
 nature-skills-main/
-cocoindex/
+/cocoindex/
 *.zip
 
 # ---- 运行期数据 / 数据库 / 日志 ----
-database/
+/database/
 coco_data/
-logs/
-storage/
+/logs/
+/storage/
 project_storage/
-workspace/
-temp/
+/workspace/
+/temp/
 *.log
 *.db
 *.sqlite
@@ -64,8 +64,8 @@ Thumbs.db
 session-dashboard.html
 HANDOVER.md
 # opencode embedding (runtime kernel state / bundled kernel binary)
-opencode/
-kernel_home/
+/opencode/
+/kernel_home/
 **/kernel_assets/_generated/
 
 # ---- LoopX 本地状态 ----
