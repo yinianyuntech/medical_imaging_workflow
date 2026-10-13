@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import sys
 from pathlib import Path
 
 # PROJECT_ROOT：优先环境变量；否则沿用历史硬编码路径（若存在）；再回退到 spec 所在目录。
@@ -46,6 +47,16 @@ hidden = [
     "mcp.server.fastmcp",
     "mcp.server.mcpserver",
 ]
+# pywin32（Windows）：mcp 的 os/win32/utilities 在 win32 上无条件 import 这些
+if sys.platform == "win32":
+    hidden += ["pywintypes", "pythoncom", "win32api", "win32con", "win32job"]
+# uvicorn 动态加载的 loops/protocols/lifespan 实现（冻结环境显式收集）
+hidden += [
+    "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.loops.asyncio",
+    "uvicorn.protocols", "uvicorn.protocols.http", "uvicorn.protocols.http.auto",
+    "uvicorn.protocols.http.h11_impl", "uvicorn.protocols.websockets",
+    "uvicorn.protocols.websockets.auto", "uvicorn.lifespan", "uvicorn.lifespan.on",
+]
 
 # ── Exclude unused heavy packages ──
 excludes = [
@@ -59,7 +70,7 @@ excludes = [
     "pytest",
     "Cython",
     "mypy",
-    "pythoncom", "pywintypes", "win32com",
+    # （pywin32 曾被误排除 -> 冻结包内核启动崩：No module named pywintypes，已移除）
 ]
 
 # ── opencode 内嵌：随包 agent/skill 资产 + 可选内核二进制 ──
